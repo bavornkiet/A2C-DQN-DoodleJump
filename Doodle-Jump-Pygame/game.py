@@ -1,6 +1,17 @@
-import pygame, sys, random, math, os, time
+from collections import deque
+import numpy as np
+import torch.nn.functional as F
+import torch.optim as optim
+import torch.nn as nn
+import torch
+import pygame
+import sys
+import random
+import math
+import os
+import time
 
-RENDER = False
+RENDER = True
 # default resolution: 360 x 640
 RESOLUTION = WIDTH, HEIGHT = 360, 640
 TITLE = "Doodle Jump"
@@ -30,7 +41,7 @@ class Player():
     width = 32 * y_scale
 
     def __init__(self):
-        self.y = HEIGHT - self.height
+        self.y = HEIGHT - self.height  # Player's y-coordinate.
         self.x = (WIDTH - self.width) // 2
         self.y_speed = -self.jump_force
         self.x_speed = 0
@@ -39,29 +50,41 @@ class Player():
         self.score = 0
 
     def move(self, left_key_pressed, right_key_pressed, time_scale):
+        # Purpose:
+        #   Handles the movement of the player in
+        #   response to key presses and applies gravity.
+
         # simulate gravity
         self.y_speed += gravity * time_scale
         self.y += self.y_speed * time_scale
 
         # change player's speed
+        # Player speed will gradually slow down
+        # No movement direction = 0
         if left_key_pressed == right_key_pressed:
             self.x_speed = (max(0, math.fabs(self.x_speed) - (
-                        self.x_acceleration / 2) * time_scale)) * self.moving_direction
+                self.x_acceleration / 2) * time_scale)) * self.moving_direction
             self.direction = 0
+
+        # Player Move Left
         elif left_key_pressed:
-            self.x_speed = max(-self.max_x_speed, self.x_speed - self.x_acceleration * time_scale)
+            self.x_speed = max(-self.max_x_speed, self.x_speed -
+                               self.x_acceleration * time_scale)
             self.direction = -1
             self.moving_direction = -1
+
+        # Player Move Right
         elif right_key_pressed:
-            self.x_speed = min(self.max_x_speed, self.x_speed + self.x_acceleration * time_scale)
+            self.x_speed = min(self.max_x_speed, self.x_speed +
+                               self.x_acceleration * time_scale)
             self.direction = 1
             self.moving_direction = 1
 
         # move player
         self.x += self.x_speed * time_scale
-        if self.x + self.width + 20 < 0:
+        if self.x + self.width + 20 < 0:  # Check if the player is off from the left side of the screen
             self.x = WIDTH
-        if self.x > WIDTH:
+        if self.x > WIDTH:  # Check if the player is off from the right side of the screen
             self.x = -20 - self.width
 
     def jump(self):
@@ -71,8 +94,10 @@ class Player():
         self.y_speed = -self.jump_force * 2
 
     def draw(self):
-        pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
-        pygame.draw.rect(screen, (0, 0, 0), (self.x, self.y, self.width, self.height), 1)
+        pygame.draw.rect(screen, self.color,
+                         (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, (0, 0, 0),
+                         (self.x, self.y, self.width, self.height), 1)
         if self.direction <= 0:
             pygame.draw.rect(screen, self.color2,
                              (self.x + 6 * y_scale, self.y + 6 * y_scale, 7 * y_scale, 7 * y_scale))
@@ -89,8 +114,10 @@ class Player():
             pygame.draw.rect(screen, (0, 0, 0),
                              (self.x + self.width - 15 * y_scale, self.y + 18 * y_scale, 15 * y_scale, 7 * y_scale), 1)
         elif self.direction == -1:
-            pygame.draw.rect(screen, self.color2, (self.x, self.y + 18 * y_scale, 15 * y_scale, 7 * y_scale))
-            pygame.draw.rect(screen, (0, 0, 0), (self.x, self.y + 18 * y_scale, 15 * y_scale, 7 * y_scale), 1)
+            pygame.draw.rect(screen, self.color2, (self.x,
+                             self.y + 18 * y_scale, 15 * y_scale, 7 * y_scale))
+            pygame.draw.rect(screen, (0, 0, 0), (self.x, self.y +
+                             18 * y_scale, 15 * y_scale, 7 * y_scale), 1)
         else:
             pygame.draw.rect(screen, self.color2,
                              (self.x + 4 * y_scale, self.y + 18 * y_scale, 24 * y_scale, 7 * y_scale))
@@ -152,8 +179,10 @@ class Platform():
             self.x = WIDTH - self.width
 
     def draw(self, time_scale):
-        pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
-        pygame.draw.rect(screen, (0, 0, 0), (self.x, self.y, self.width, self.height), 1)
+        pygame.draw.rect(screen, self.color,
+                         (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, (0, 0, 0),
+                         (self.x, self.y, self.width, self.height), 1)
         if self.alpha > 0:
             self.alpha += 16 * time_scale
             s = pygame.Surface((self.width, self.height))
@@ -168,12 +197,14 @@ class Spring():
     color = (127, 127, 127)
 
     def __init__(self, platform):
-        self.x = platform.x + platform.width // 2 - self.width // 2 + random.randint(
-            -platform.width // 2 + self.width // 2, platform.width // 2 - self.width // 2)
+        self.x = platform.x + int(platform.width // 2) - int(self.width // 2) + random.randint(
+            -int(platform.width // 2) + int(self.width // 2), int(platform.width // 2) - int(self.width // 2))
+
         self.y = platform.y - self.height
         self.direction = platform.direction
         self.left_edge = self.x - platform.x
-        self.right_edge = WIDTH - ((platform.x + platform.width) - (self.x + self.width))
+        self.right_edge = WIDTH - \
+            ((platform.x + platform.width) - (self.x + self.width))
 
     def move(self, time_scale):
         self.x += self.direction * time_scale
@@ -185,8 +216,10 @@ class Spring():
             self.x = self.right_edge - self.width
 
     def draw(self):
-        pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
-        pygame.draw.rect(screen, (0, 0, 0), (self.x, self.y, self.width, self.height), 1)
+        pygame.draw.rect(screen, self.color,
+                         (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, (0, 0, 0),
+                         (self.x, self.y, self.width, self.height), 1)
 
 
 def new_platforms(player):
@@ -239,9 +272,9 @@ def get_event():
     if RENDER:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                file = open(file_name, "w")
-                file.write(str(int(high_score)))
-                file.close()
+                # file = open(file_name, "w")
+                # file.write(str(int(high_score)))
+                # file.close()
                 pygame.quit()
                 sys.exit()
     pressed = pygame.key.get_pressed()
@@ -257,8 +290,8 @@ def update_game(player, platforms, springs, time_scale, movement):
         platforms[i].move(time_scale)
         # check if player fall on a platform
         if player.y_speed >= 0 and player.x < platforms[i].x + Platform.width and player.x + Player.width > platforms[
-            i].x and player.y + Player.height <= platforms[
-            i].y + time_scale * player.y_speed and player.y + Player.height >= platforms[i].y:
+                i].x and player.y + Player.height <= platforms[
+                i].y + time_scale * player.y_speed and player.y + Player.height >= platforms[i].y:
             if platforms[i].type != 2:
                 player.y = platforms[i].y - Player.height
                 player.jump()
@@ -291,7 +324,7 @@ def render_game(screen, player, platforms, springs, time_scale):
 
     player.draw()
 
-    #print scores
+    # print scores
     font = pygame.font.SysFont("Comic Sans MS", int(24 * y_scale))
     text = font.render("Score:", True, (0, 0, 0))
     text2 = font.render(str(int(player.score)), True, (0, 0, 0))
@@ -316,6 +349,7 @@ def new_game():
     prev_time = pygame.time.get_ticks()
     return player, platforms, springs, time_scale, prev_time
 
+
 def is_game_over(player):
     if player.score == 0 and player.y + Player.height > HEIGHT - 2:
         player.y = HEIGHT - 2 - Player.height
@@ -324,6 +358,7 @@ def is_game_over(player):
     elif player.y > HEIGHT:
         return True
     return False
+
 
 def simulate(player, platforms, springs, time_scale):
     (left_key_pressed, right_key_pressed) = get_event()
@@ -342,19 +377,18 @@ def simulate(player, platforms, springs, time_scale):
         render_game(screen, player, platforms, springs, time_scale)
 
 
-
 player, platforms, springs, time_scale, prev_time = new_game()
 
 
 def read_high_score():
-    if os.path.isfile(file_name) == False:
-        file = open(file_name, "w")
-        file.write("0")
-        file.close()
-    file = open(file_name, "r+")
-    high_score = int(file.read())
-    file.close()
-    return high_score
+    # if os.path.isfile(file_name) == False:
+    # file = open(file_name, "w")
+    # file.write("0")
+    # file.close()
+    # file = open(file_name, "r+")
+    # high_score = int(file.read())
+    # file.close()
+    return 0
 
 
 high_score = read_high_score()
@@ -369,7 +403,8 @@ while True:
         player, platforms, springs, time_scale, prev_time = new_game()
 
     # Prevent the code from running too fast during a simulation
-    if not RENDER: time.sleep(0.01)
+    if not RENDER:
+        time.sleep(0.01)
 
     time_scale = (pygame.time.get_ticks() - prev_time) / 10 * TIME_SPEED
     prev_time = pygame.time.get_ticks()
