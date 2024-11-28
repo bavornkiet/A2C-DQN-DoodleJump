@@ -1,1 +1,4 @@
-s
+torch
+gym
+pygame
+numpy
