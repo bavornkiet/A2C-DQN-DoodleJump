@@ -1,10 +1,19 @@
+from rewards import formulate_reward
+import time
+import numpy as np
+import os
+import math
+import random
 import pygame
 import sys
-import random
-import math
-import numpy as np
-import time
+from pathlib import Path
+# sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../')
 
+# path = './src/env/'
+
+# sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+# sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+# Add the parent directory to the module search path
 # Game Constants
 RENDER = True
 RESOLUTION = WIDTH, HEIGHT = 360, 640
@@ -211,8 +220,9 @@ class Spring():
 
 
 class DoodleJumpEnv:
-    def __init__(self):
-        self.RENDER = RENDER
+    def __init__(self, reward_type=1, render=RENDER):
+        self.RENDER = render
+        self.reward_type = reward_type  # Add reward_type to the environment
         if self.RENDER:
             self.screen = screen
         self.gravity = gravity
@@ -232,10 +242,15 @@ class DoodleJumpEnv:
         self.time_scale = 1
         self.prev_time = pygame.time.get_ticks()
         self.high_score = 0
+        self.spring_touch = False  # Initialize spring touch flag
+        # Initialize monster touch flag (not used here)
+        self.monster_touch = False
 
     def frame_step(self, action):
-        reward = 0
         terminal = False
+        reward_reason = "DEFAULT"
+        self.spring_touch = False  # Reset spring touch flag
+        self.monster_touch = False  # Reset monster touch flag (not used here)
 
         # Convert action to game inputs
         left_key_pressed, right_key_pressed = self.process_action(action)
@@ -250,7 +265,7 @@ class DoodleJumpEnv:
             self.player.y = self.HEIGHT // 2 - self.player.height
             self.player.score += movement / 4 / self.y_scale
             if movement > 0:
-                reward += 1  # Reward for moving up
+                reward_reason = "SCORED"  # Reward for moving up
 
         # Update game objects
         self.update_game(movement)
@@ -260,11 +275,14 @@ class DoodleJumpEnv:
 
         # Check for game over
         if self.is_game_over():
-            reward = -100
+            reward_reason = "DEAD"
             terminal = True
+            if self.player.score > self.high_score:
+                self.high_score = self.player.score
             self.reset_game()
         else:
-            reward += 0.1  # Small reward for staying alive
+            if reward_reason == "DEFAULT":
+                pass  # No special event occurred
 
         # Render the game
         if self.RENDER:
@@ -272,6 +290,15 @@ class DoodleJumpEnv:
 
         # Get observation
         observation = self.get_observation()
+
+        # Calculate reward using formulate_reward
+        reward = formulate_reward(
+            self.reward_type,
+            reward_reason,
+            spring_touch=self.spring_touch,
+            monster_touch=self.monster_touch,
+            score=self.player.score
+        )
 
         # Update time scale
         current_time = pygame.time.get_ticks()
@@ -318,6 +345,7 @@ class DoodleJumpEnv:
             spring.move(self.time_scale)
             if self.player.y_speed >= 0 and self.player.x < spring.x + Spring.width and self.player.x + Player.width > spring.x and self.player.y + Player.height >= spring.y and self.player.y <= spring.y + Spring.height:
                 self.player.high_jump()
+                self.spring_touch = True  # Set spring touch flag
 
     def new_platforms(self):
         player = self.player
@@ -361,14 +389,14 @@ class DoodleJumpEnv:
 
     def get_observation(self):
         # Return the game screen as an observation
-        if self.RENDER:
-            observation = pygame.surfarray.array3d(
-                pygame.display.get_surface())
-            observation = np.transpose(observation, (1, 0, 2))
-            return observation
-        else:
-            # Return a simplified observation if rendering is disabled
-            return np.array([self.player.x, self.player.y, self.player.x_speed, self.player.y_speed])
+        # if self.RENDER:
+        observation = pygame.surfarray.array3d(
+            pygame.display.get_surface())
+        # observation = np.transpose(observation, (1, 0, 2))
+        return observation
+        # else:
+        #     # Return a simplified observation if rendering is disabled
+        #     return np.array([self.player.x, self.player.y, self.player.x_speed, self.player.y_speed])
 
     def render_game(self):
         self.screen.fill(self.background_color)
@@ -395,35 +423,46 @@ class DoodleJumpEnv:
                          10 * y_scale, 24 * y_scale))
         pygame.display.update()
 
+    def play(self):
+        # Method to allow human players to play the game
+        clock = pygame.time.Clock()
+        while True:
+            self.time_scale = clock.tick(60) / 10 * TIME_SPEED
+
+            left_key_pressed = False
+            right_key_pressed = False
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.close()
+
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                left_key_pressed = True
+            if keys[pygame.K_RIGHT]:
+                right_key_pressed = True
+
+            # Determine action based on keys
+            if left_key_pressed and not right_key_pressed:
+                action = 1  # Move left
+            elif right_key_pressed and not left_key_pressed:
+                action = 2  # Move right
+            else:
+                action = 0  # No action
+
+            # Call frame_step
+            observation, reward, terminal = self.frame_step(action)
+
+            # If terminal, reset game
+            if terminal:
+                pass  # Optionally, handle end of game
+
     def close(self):
         pygame.quit()
         sys.exit()
 
 
-env = DoodleJumpEnv()
-
-# Number of episodes to run
-num_episodes = 5
-
-for episode in range(num_episodes):
-    env.reset_game()
-    total_reward = 0
-    terminal = False
-    step = 0
-
-    print(f"Starting episode {episode + 1}")
-
-    while not terminal:
-        # Select a random action
-        action = 1
-        # Take a step in the environment
-        observation, reward, terminal = env.frame_step(action)
-        total_reward += reward
-        step += 1
-
-        # Optional: Add a delay to slow down the game
-        # time.sleep(0.01)
-
-    print(f"Episode {episode + 1} ended with total reward: {total_reward}")
-
-env.close()
+# Run the game if this script is executed directly
+if __name__ == "__main__":
+    env = DoodleJumpEnv(reward_type=1, render=True)
+    env.play()
