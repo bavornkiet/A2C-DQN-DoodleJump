@@ -266,16 +266,6 @@ class DoodleJump:
             pygame.draw.line(self.screen, (222, 222, 222),
                              (0, x * 12), (800, x * 12))
 
-    def getCurrentFrame(self):
-        """
-            - No Param function
-            - Returns
-                - A screengrab of current pygame display
-            - To be used by agent script to get current state
-        """
-        image_data = pygame.surfarray.array3d(pygame.display.get_surface())
-        return image_data
-
     def updatePlayerByAction(self, actions):
         """
             - actions = ['ACTION_LEFT', 'NO_ACTION', 'ACTION_RIGHT']
@@ -331,6 +321,7 @@ class DoodleJump:
 
     def getFeatures(self):
         features = {}
+        x = 0
         features['player_x'] = self.playerx
         features['player_y'] = self.playery - \
             self.cameray  # Adjusted for camera
@@ -339,45 +330,46 @@ class DoodleJump:
             self.jump if self.jump else self.gravity
         features['score'] = self.score
 
-        # Nearby platforms within 400 pixels below the player
-        nearby_platforms = []
+        # Platforms that are currently visible on the screen
+        visible_platforms = []
         for p in self.platforms:
             platform_y = p[1] - self.cameray
-            if features['player_y'] <= platform_y <= features['player_y'] + 400:
-                nearby_platforms.append({
+            if 0 <= platform_y <= 800:  # Screen height is 800 pixels
+                visible_platforms.append({
                     'x': p[0],
                     'y': platform_y,
                     'type': p[2],  # Platform type: 0-green, 1-blue, 2-red
                     'state': p[3]  # State for moving/broken platforms
                 })
+                x += 1
         # Sort platforms by y-coordinate
-        nearby_platforms.sort(key=lambda p: p['y'])
-        # Include up to 5 platforms
-        features['platforms'] = nearby_platforms[:5]
-
-        # Nearby springs
-        nearby_springs = []
+        visible_platforms.sort(key=lambda p: p['y'])
+        # Include all visible platforms
+        features['platforms'] = visible_platforms
+        print(x)
+        # Visible springs
+        visible_springs = []
         for s in self.springs:
             spring_y = s[1] - self.cameray
-            if features['player_y'] <= spring_y <= features['player_y'] + 400:
-                nearby_springs.append({
+            if 0 <= spring_y <= 800:
+                visible_springs.append({
                     'x': s[0],
                     'y': spring_y,
                     'state': s[2]  # Spring state
                 })
-        features['springs'] = nearby_springs
+        features['springs'] = visible_springs
 
-        # Nearby monsters
-        nearby_monsters = []
+        # Visible monsters
+        visible_monsters = []
         for m in self.monsters:
             monster_y = m[1] - self.cameray
-            if features['player_y'] <= monster_y <= features['player_y'] + 400:
-                nearby_monsters.append({
+            if 0 <= monster_y <= 800:
+                visible_monsters.append({
                     'x': m[0],
                     'y': monster_y,
                     'state': m[2]  # Monster state
                 })
-        features['monsters'] = nearby_monsters
+        features['monsters'] = visible_monsters
 
         return features
 
