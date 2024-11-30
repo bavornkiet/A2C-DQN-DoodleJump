@@ -346,7 +346,7 @@ class DoodleJump:
         visible_platforms.sort(key=lambda p: p['y'])
         # Include all visible platforms
         features['platforms'] = visible_platforms
-        print(x)
+        # print(x)
         # Visible springs
         visible_springs = []
         for s in self.springs:
@@ -454,12 +454,8 @@ class DoodleJump:
 
     def run(self):
         clock = pygame.time.Clock()
-        x = 0
         while True:
             self.screen.fill((255, 255, 255))
-            if (x == 0):
-                print(self.getFeatures())
-                x += 1
             clock.tick(60)
             for event in pygame.event.get():
                 if event.type == QUIT:
