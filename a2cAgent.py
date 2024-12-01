@@ -89,9 +89,9 @@ class Runner():
         state_vector = []
 
         # Player features
-        N_PLATFORMS = 20
+        N_PLATFORMS = 15
         N_SPRINGS = 3
-        N_MONSTERS = 2
+        N_MONSTERS = 1
         player_x = state_dict['player_x']
         player_y = state_dict['player_y']
         player_xmovement = state_dict['player_xmovement']
@@ -194,7 +194,7 @@ class Runner():
         features[1] /= 800  # player_y
         features[2] /= 10  # player_xmovement
         features[3] /= 35  # player_ymovement
-        features[4] /= 100000  # score
+        features[4] /= 30000  # score
 
         # Normalize platform positions and types
         # index = 5
@@ -389,9 +389,9 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--model_path", type=str,
                         help="path to weights of an earlier trained model")
     # parser.add_argument("-cp", "--critic_path", type=str, help="path to weights of an earlier trained model")
-    parser.add_argument("-alr", "--actor_lr", type=float, default=4e-4,
+    parser.add_argument("-alr", "--actor_lr", type=float, default=1e-4,
                         help="set learning rate for training the model")
-    parser.add_argument("-clr", "--critic_lr", type=float, default=4e-3,
+    parser.add_argument("-clr", "--critic_lr", type=float, default=1e-3,
                         help="set learning rate for training the model")
     parser.add_argument("-g", "--gamma", type=float, default=0.99,
                         help="set discount factor for q learning")
@@ -415,7 +415,7 @@ if __name__ == '__main__':
                         help="when training on server add this flag")
     parser.add_argument("--seed", type=int, default=42,
                         help="change seed value for creating game randomness")
-    parser.add_argument("--max_games", type=int, default=10000,
+    parser.add_argument("--max_games", type=int, default=2000,
                         help="set the max number of games to be played by the agent")
     args = parser.parse_args()
 
@@ -454,7 +454,7 @@ if __name__ == '__main__':
     if args.test:
         test(game, args)
     else:
-        learner = A2CLearner(actorcritic, agent.device, gamma=args.gamma, entropy_beta=0,
+        learner = A2CLearner(actorcritic, agent.device, gamma=args.gamma, entropy_beta=0.01,
                              actor_lr=args.actor_lr, critic_lr=args.critic_lr, max_grad_norm=0.5,
                              batch_size=args.batch_size)
 
