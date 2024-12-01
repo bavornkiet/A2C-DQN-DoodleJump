@@ -24,6 +24,7 @@ def formulate_reward(reward_type, reward_reason, spring_touch=False, monster_tou
         if reward_reason == "DEAD":
             reward = -2
         if reward_reason == "STUCK":
+
             reward = -2
         if reward_reason == "SCORED":
             reward = 3
