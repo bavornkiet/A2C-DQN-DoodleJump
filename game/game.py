@@ -11,7 +11,7 @@ path = './game/'
 
 
 class DoodleJump:
-    def __init__(self, difficulty='EASY', server=False, reward_type=1):
+    def __init__(self, difficulty='EASY', server=False, reward_type=1, FPS=30000):
         # To change the difficulty of the game, only tune these two parameters:
         # inter_platform_distance - distance between two platforms at two consecutive levels.
         # second_platform_prob - the probability with which you need two platforms at the same level.
@@ -25,35 +25,49 @@ class DoodleJump:
             self.inter_platform_distance = 80
             self.second_platform_prob = 850
 
+        self.frame_count = 0  # Initialize frame counter
+
+
+# Adjust this value to skip frames (e.g., render every 2nd frame)
+        self.render_skip = 1
+
         if server:
             os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
         pygame.font.init()
+        self.screen_width = 800
+        self.screen_height = 800
+        self.max_x_speed = 10
+        self.max_y_speed = 35
+        self.max_score = 100000
+        self.FPSCLOCK = pygame.time.Clock()
+        self.FPS = FPS
+
         self.reward_type = reward_type
         self.screen = pygame.display.set_mode((800, 800))
-        self.green = pygame.image.load("assets/green.png").convert_alpha()
+        self.green = pygame.image.load(path+"assets/green.png").convert_alpha()
         self.font = pygame.font.SysFont("Arial", 25)
-        self.blue = pygame.image.load("assets/blue.png").convert_alpha()
-        self.red = pygame.image.load("assets/red.png").convert_alpha()
-        self.red_1 = pygame.image.load("assets/red_1.png").convert_alpha()
+        self.blue = pygame.image.load(path+"assets/blue.png").convert_alpha()
+        self.red = pygame.image.load(path+"assets/red.png").convert_alpha()
+        self.red_1 = pygame.image.load(path+"assets/red_1.png").convert_alpha()
         self.playerRight = pygame.image.load(
-            "assets/right.png").convert_alpha()
+            path+"assets/right.png").convert_alpha()
         self.playerRight_1 = pygame.image.load(
-            "assets/right_1.png").convert_alpha()
+            path+"assets/right_1.png").convert_alpha()
         self.playerLeft = pygame.image.load(
-            "assets/left.png").convert_alpha()
+            path+"assets/left.png").convert_alpha()
         self.playerLeft_1 = pygame.image.load(
-            "assets/left_1.png").convert_alpha()
+            path+"assets/left_1.png").convert_alpha()
         self.playerdead = pygame.image.load(
-            "assets/playerdead.png").convert_alpha()
+            path+"assets/playerdead.png").convert_alpha()
         self.spring = pygame.image.load(
-            "assets/spring.png").convert_alpha()
+            path+"assets/spring.png").convert_alpha()
         self.spring_1 = pygame.image.load(
-            "assets/spring_1.png").convert_alpha()
+            path+"assets/spring_1.png").convert_alpha()
         self.monster = pygame.image.load(
-            "assets/monster1.png").convert_alpha()
+            path+"assets/monster1.png").convert_alpha()
         self.monsterdead = pygame.image.load(
-            "assets/monsterdead.png").convert_alpha()
+            path+"assets/monsterdead.png").convert_alpha()
         self.score = 0
         self.direction = 0
         self.playerx = 400
@@ -388,17 +402,20 @@ class DoodleJump:
 
         pygame.display.flip()
         self.screen.fill((255, 255, 255))
-        self.clock.tick(60)
+        self.FPSCLOCK.tick(self.FPS)
+        self.frame_count += 1
+        if self.frame_count % self.render_skip == 0:
+            pygame.display.flip()
         for event in pygame.event.get():
             if event.type == QUIT:
                 sys.exit()
         if self.die == 1 or (self.playery - self.cameray > 900):
-            features = self.getFeatures()
+            # features = self.getFeatures()
             return_score = self.gameReboot()
             terminal = True
             reward = formulate_reward(self.reward_type, "DEAD")
             print("terminated: Agent Died")
-            return reward, terminal, return_score, features
+            return reward, terminal, return_score
 
         self.drawGrid()
         score_inc, spring_touch, monster_touch = self.drawPlatforms()
@@ -413,23 +430,23 @@ class DoodleJump:
                 self.timer = time.time()
             else:
                 now_time = time.time()
-                if (now_time - self.timer) > 100:
-                    features = self.getFeatures()
+                if (now_time - self.timer) > 10:
+                    # features = self.getFeatures()
                     return_score = self.gameReboot()
                     terminal = True
                     reward = formulate_reward(self.reward_type, "STUCK")
                     print("terminated: Agent stuck")
-                    return reward, terminal, return_score, features
+                    return reward, terminal, return_score
 
         self.updatePlayerByAction(actions)
         self.updatePlatforms()
         self.screen.blit(self.font.render(
             str(self.score), -1, (0, 0, 0)), (25, 25))
         pygame.display.flip()
-        if not terminal:
-            features = self.getFeatures()
+        # if not terminal:
+        #     features = self.getFeatures()
 
-        return reward, terminal, return_score, features
+        return reward, terminal, return_score
 
     def gameReboot(self):
         """
@@ -454,9 +471,16 @@ class DoodleJump:
 
     def run(self):
         clock = pygame.time.Clock()
+        x = 0
         while True:
             self.screen.fill((255, 255, 255))
             clock.tick(60)
+            if (x == 0):
+                f = self.getFeatures()
+                print(f)
+                print('--------------------------')
+                print(f['platforms'][0]['x'])
+                x += 1
             for event in pygame.event.get():
                 if event.type == QUIT:
                     sys.exit()
