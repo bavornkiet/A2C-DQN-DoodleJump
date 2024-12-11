@@ -279,6 +279,16 @@ class DoodleJump:
                              (x * 12, 0), (x * 12, 800))
             pygame.draw.line(self.screen, (222, 222, 222),
                              (0, x * 12), (800, x * 12))
+    
+    def getCurrentFrame(self):
+        """
+            - No Param function
+            - Returns
+                - A screengrab of current pygame display
+            - To be used by agent script to get current state
+        """
+        image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+        return image_data
 
     def updatePlayerByAction(self, actions):
         """
