@@ -16,11 +16,11 @@ class DoodleJump:
         # inter_platform_distance - distance between two platforms at two consecutive levels.
         # second_platform_prob - the probability with which you need two platforms at the same level.
         if difficulty == "HARD":
+            self.inter_platform_distance = 200
+            self.second_platform_prob = 500
+        elif difficulty == "MEDIUM":
             self.inter_platform_distance = 100
             self.second_platform_prob = 700
-        elif difficulty == "MEDIUM":
-            self.inter_platform_distance = 90
-            self.second_platform_prob = 750
         else:  # EASY
             self.inter_platform_distance = 80
             self.second_platform_prob = 850
@@ -29,7 +29,7 @@ class DoodleJump:
 
 
 # Adjust this value to skip frames (e.g., render every 2nd frame)
-        self.render_skip = 1
+        self.render_skip = 120
 
         if server:
             os.environ['SDL_VIDEODRIVER'] = 'dummy'
@@ -86,9 +86,7 @@ class DoodleJump:
 
     def updatePlayer(self):
         if self.die == 1:
-            self.screen.blit(self.playerdead, (self.playerx,
-                             self.playery - self.cameray))
-
+            self.screen.blit(self.playerdead, (self.playerx, self.playery - self.cameray))
             return
         if not self.jump:
             self.playery += self.gravity
@@ -96,42 +94,52 @@ class DoodleJump:
         elif self.jump:
             self.playery -= self.jump
             self.jump -= 1
+
         key = pygame.key.get_pressed()
+        
+        # Right movement
         if key[K_RIGHT]:
             if self.xmovement < 10:
-                self.xmovement += 1
+                self.xmovement += 0.5
             self.direction = 0
 
+        # Left movement
         elif key[K_LEFT]:
             if self.xmovement > -10:
-                self.xmovement -= 1
+                self.xmovement -= 0.5
             self.direction = 1
+
+        # Apply proportional deceleration when no movement keys are pressed
         else:
             if self.xmovement > 0:
-                self.xmovement -= 1
+                self.xmovement -= max(0.1, 0.1 * self.xmovement)  # Deceleration proportional to speed
             elif self.xmovement < 0:
-                self.xmovement += 1
+                self.xmovement += max(0.1, 0.1 * abs(self.xmovement))  # Deceleration proportional to speed
+
+        # Wrap player around the screen
         if self.playerx > 850:
             self.playerx = -50
         elif self.playerx < -50:
             self.playerx = 850
+
+        # Update the player's position
         self.playerx += self.xmovement
+        
+        # Update the camera if the player moves up
         if self.playery - self.cameray <= 200:
             self.cameray -= 10
+        
+        # Blit the player based on direction and jump status
         if not self.direction:
             if self.jump:
-                self.screen.blit(self.playerRight_1,
-                                 (self.playerx, self.playery - self.cameray))
+                self.screen.blit(self.playerRight_1, (self.playerx, self.playery - self.cameray))
             else:
-                self.screen.blit(self.playerRight,
-                                 (self.playerx, self.playery - self.cameray))
+                self.screen.blit(self.playerRight, (self.playerx, self.playery - self.cameray))
         else:
             if self.jump:
-                self.screen.blit(self.playerLeft_1,
-                                 (self.playerx, self.playery - self.cameray))
+                self.screen.blit(self.playerLeft_1, (self.playerx, self.playery - self.cameray))
             else:
-                self.screen.blit(
-                    self.playerLeft, (self.playerx, self.playery - self.cameray))
+                self.screen.blit(self.playerLeft, (self.playerx, self.playery - self.cameray))
 
     def updatePlatforms(self):
         for p in self.platforms:
@@ -140,13 +148,13 @@ class DoodleJump:
             player = pygame.Rect(self.playerx, self.playery, self.playerRight.get_width(
             ) - 10, self.playerRight.get_height())
 
-            if rect.colliderect(player) and self.gravity and self.playery < (p[1] - self.cameray):
+            if rect.colliderect(player) and player.bottom < rect.bottom and self.gravity and self.playery < (p[1] - self.cameray):
                 if p[2] != 2:
-                    self.jump = 15
+                    self.jump = 20
                     self.gravity = 0
                 else:
                     if p[-1] != 1:
-                        self.jump = 15  # jump even when you hit red broken platform
+                        self.jump = 20 # jump even when you hit red broken platform
                         p[-1] = 1
                     else:
                         self.jump = 0
@@ -306,19 +314,19 @@ class DoodleJump:
 
         if actions[2]:
             if self.xmovement < 10:
-                self.xmovement += 1
+                self.xmovement += 1.5
             self.direction = 0
 
         elif actions[0]:
             if self.xmovement > -10:
-                self.xmovement -= 1
+                self.xmovement -= 1.5
             self.direction = 1
 
         else:  # action[1] is true
             if self.xmovement > 0:
-                self.xmovement -= 1
+                self.xmovement -= 1.5
             elif self.xmovement < 0:
-                self.xmovement += 1
+                self.xmovement += 1.5
 
         if self.playerx > 850:
             self.playerx = -50
@@ -507,5 +515,6 @@ class DoodleJump:
 
 
 if __name__ == "__main__":
+    path = ""
     game = DoodleJump()
     game.run()

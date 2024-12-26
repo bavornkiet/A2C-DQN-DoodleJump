@@ -4,6 +4,7 @@ import argparse
 import random
 import cv2
 import torch
+from scipy.stats import trim_mean
 import numpy as np
 from collections import deque
 from game.game import DoodleJump
@@ -11,7 +12,6 @@ from model.deepQNetwork import Deep_QNet, Deep_RQNet, DQ_Resnet18, DQ_Mobilenet,
 from model.dqnTrainer import QTrainer
 from helper import write_model_params
 from torch.utils.tensorboard import SummaryWriter
-
 
 class Agent:
     def __init__(self, args):
@@ -151,6 +151,8 @@ def train(game, args, writer):
     sum_rewards = 0
     sum_short_loss = 0
     total_score = 0
+    score_array = []
+    reward_array = []
     record = 0
     loop_ctr = 0
     agent = Agent(args)
@@ -170,6 +172,7 @@ def train(game, args, writer):
         reward, done, score = game.playStep(final_move)
 
         state_new = agent.get_state(game)
+        reward_array.append(reward)
         sum_rewards += reward
         writer.add_scalar('Reward/curr_reward', reward, loop_ctr)
 
@@ -204,20 +207,25 @@ def train(game, args, writer):
 
             print('Game', agent.n_games, 'Score', score, 'Record:', record)
             writer.add_scalar('Score/High_Score', record, agent.n_games)
-
+            score_array.append(score)
             total_score += score
             mean_score = total_score / agent.n_games
             writer.add_scalars('Score', {'Curr_Score':score, 'Mean_Score': mean_score}, agent.n_games)
             write_model_params(agent.model, agent.n_games, writer)
 
+    trimmed_avg_score = trim_mean(score_array, 0.1)
+    trimmed_avg_reward = trim_mean(reward_array, 0.1)
+    print('Mean trimmed score: ', trimmed_avg_score)
+    print('Mean trimmed reward: ', trimmed_avg_reward)
     writer.add_hparams(hparam_dict=vars(args),
                         metric_dict={'long_loss_loss': long_loss,
                                      'mean_short_loss': sum_short_loss/loop_ctr,
                                      'mean_reward': sum_rewards/loop_ctr,
+                                     'trimmed_avg_score': trimmed_avg_score,
+                                     'trimmed_avg_reward': trimmed_avg_reward,
                                      'high_score': record,
                                      'mean_score': mean_score
                                      })
-
 
 def test(game, args):
     if args.macos:
