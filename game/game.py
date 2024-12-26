@@ -2,34 +2,21 @@ from rewards import formulate_reward
 import time
 import random
 import os
+import numpy as np
 import pygame
 from pygame.locals import *
 import sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../')
+import math
+# sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../')
 
 path = './game/'
+sys.path.append(path)
 
 
 class DoodleJump:
-    def __init__(self, difficulty='EASY', server=False, reward_type=1, FPS=30000):
-        # To change the difficulty of the game, only tune these two parameters:
-        # inter_platform_distance - distance between two platforms at two consecutive levels.
-        # second_platform_prob - the probability with which you need two platforms at the same level.
-        if difficulty == "HARD":
-            self.inter_platform_distance = 100
-            self.second_platform_prob = 700
-        elif difficulty == "MEDIUM":
-            self.inter_platform_distance = 90
-            self.second_platform_prob = 750
-        else:  # EASY
-            self.inter_platform_distance = 80
-            self.second_platform_prob = 850
-
-        self.frame_count = 0  # Initialize frame counter
-
-
-# Adjust this value to skip frames (e.g., render every 2nd frame)
-        self.render_skip = 1
+    def __init__(self, difficulty='EASY', server=False, reward_type=1, FPS=None, render_skip=0):
+        self.inter_platform_distance = 80
+        self.second_platform_prob = 850
 
         if server:
             os.environ['SDL_VIDEODRIVER'] = 'dummy'
@@ -41,10 +28,42 @@ class DoodleJump:
         self.max_y_speed = 35
         self.max_score = 100000
         self.FPSCLOCK = pygame.time.Clock()
-        self.FPS = FPS
+        self.FPS = FPS if FPS else 0  # 0 for unlimited FPS in Pygame
+        self.render_skip = render_skip  # Number of frames to skip
+        self.frame_count = 0
+        self.fps_counter = 0
+        self.last_time = time.time()
 
         self.reward_type = reward_type
         self.screen = pygame.display.set_mode((800, 800))
+
+        # --------------------------
+        # self.green = pygame.image.load("assets/green.png").convert_alpha()
+        # self.font = pygame.font.SysFont("Arial", 25)
+        # self.blue = pygame.image.load("assets/blue.png").convert_alpha()
+        # self.red = pygame.image.load("assets/red.png").convert_alpha()
+        # self.red_1 = pygame.image.load("assets/red_1.png").convert_alpha()
+        # self.playerRight = pygame.image.load(
+        #     "assets/right.png").convert_alpha()
+        # self.playerRight_1 = pygame.image.load(
+        #     "assets/right_1.png").convert_alpha()
+        # # print(self.playerRight.get_width())
+        # self.playerLeft = pygame.image.load(
+        #     "assets/left.png").convert_alpha()
+        # self.playerLeft_1 = pygame.image.load(
+        #     "assets/left_1.png").convert_alpha()
+        # self.playerdead = pygame.image.load(
+        #     "assets/playerdead.png").convert_alpha()
+        # self.spring = pygame.image.load(
+        #     "assets/spring.png").convert_alpha()
+        # self.spring_1 = pygame.image.load(
+        #     "assets/spring_1.png").convert_alpha()
+        # self.monster = pygame.image.load(
+        #     "assets/monster1.png").convert_alpha()
+        # self.monsterdead = pygame.image.load(
+        #     "assets/monsterdead.png").convert_alpha()
+
+        # ------------------------------------------
         self.green = pygame.image.load(path+"assets/green.png").convert_alpha()
         self.font = pygame.font.SysFont("Arial", 25)
         self.blue = pygame.image.load(path+"assets/blue.png").convert_alpha()
@@ -54,6 +73,7 @@ class DoodleJump:
             path+"assets/right.png").convert_alpha()
         self.playerRight_1 = pygame.image.load(
             path+"assets/right_1.png").convert_alpha()
+        # print(self.playerRight.get_width())
         self.playerLeft = pygame.image.load(
             path+"assets/left.png").convert_alpha()
         self.playerLeft_1 = pygame.image.load(
@@ -81,14 +101,12 @@ class DoodleJump:
         self.xmovement = 0
         self.die = 0
         self.timer = None
-        self.clock = pygame.time.Clock()
         self.generatePlatforms()
 
     def updatePlayer(self):
         if self.die == 1:
             self.screen.blit(self.playerdead, (self.playerx,
                              self.playery - self.cameray))
-
             return
         if not self.jump:
             self.playery += self.gravity
@@ -259,7 +277,7 @@ class DoodleJump:
     def generatePlatforms(self):
         on = 800
         while on > -100:
-            x1 = random.randint(0, 700)
+            x1 = random.randint(100, 700)
             platform1 = self.getNewPlatform(x1, on)
             self.platforms.append(platform1)
 
@@ -333,79 +351,269 @@ class DoodleJump:
                 self.screen.blit(
                     self.playerLeft, (self.playerx, self.playery - self.cameray))
 
-    def getFeatures(self):
-        features = {}
-        x = 0
-        features['player_x'] = self.playerx
-        features['player_y'] = self.playery - \
-            self.cameray  # Adjusted for camera
-        features['player_xmovement'] = self.xmovement
-        features['player_ymovement'] = - \
-            self.jump if self.jump else self.gravity
-        features['score'] = self.score
+    def getFeatures(self, max_platforms=10, max_monsters=3):
+        """
+        Returns a single 1D NumPy array encoding:
+        1) Agent's normalized state
+        2) Up to 10 closest platforms (relative coords, type in one-hot, broken-flag, has_spring).
+        3) Up to 3 closest monsters (optional).
+        """
 
-        # Platforms that are currently visible on the screen
-        visible_platforms = []
+        # -----------------------
+        # 1) AGENT (DOODLER) STATE
+        # -----------------------
+        player_x_norm = self.playerx / float(self.screen_width)
+        player_y_screen = self.playery - self.cameray
+        player_y_norm = player_y_screen / float(self.screen_height)
+
+        # Normalize velocities
+        x_velocity_norm = self.xmovement / 10.0   # range ~[-1..+1]
+        jump_norm = self.jump / 35.0        # range ~[0..1]
+        # range ~[0..1], sometimes larger
+        gravity_norm = self.gravity / 35.0
+
+        agent_features = [
+            player_x_norm,
+            player_y_norm,
+            x_velocity_norm,
+            jump_norm,
+            gravity_norm
+        ]
+
+        # ------------------------------------------------
+        # 2) SELECT THE 10 CLOSEST PLATFORMS BY DISTANCE
+        # ------------------------------------------------
+        platforms_data = []
         for p in self.platforms:
-            platform_y = p[1] - self.cameray
-            if 0 <= platform_y <= 800:  # Screen height is 800 pixels
-                visible_platforms.append({
-                    'x': p[0],
-                    'y': platform_y,
-                    'type': p[2],  # Platform type: 0-green, 1-blue, 2-red
-                    'state': p[3]  # State for moving/broken platforms
-                })
-                x += 1
-        # Sort platforms by y-coordinate
-        visible_platforms.sort(key=lambda p: p['y'])
-        # Include all visible platforms
-        features['platforms'] = visible_platforms
-        # print(x)
-        # Visible springs
-        visible_springs = []
-        for s in self.springs:
-            spring_y = s[1] - self.cameray
-            if 0 <= spring_y <= 800:
-                visible_springs.append({
-                    'x': s[0],
-                    'y': spring_y,
-                    'state': s[2]  # Spring state
-                })
-        features['springs'] = visible_springs
+            # p = [x, y, type, broken_flag]
+            px = p[0]
+            py = p[1] - self.cameray
 
-        # Visible monsters
-        visible_monsters = []
+            dx = px - self.playerx
+            if dx > self.screen_width / 2:
+                dx -= self.screen_width
+            elif dx < -self.screen_width / 2:
+                dx += self.screen_width
+
+            dy = py - player_y_screen
+
+            dist = math.sqrt(dx*dx + dy*dy)
+            platforms_data.append((dist, px, py, p[2], p[3]))
+        platforms_data.sort(key=lambda x: x[0])
+        nearest_platforms = platforms_data[:max_platforms]
+
+        # Build the sub-features for each of the 10 platforms
+        platform_features = []
+        for i in range(max_platforms):
+            if i < len(nearest_platforms):
+                (dist, px, py, p_type, p_broken) = nearest_platforms[i]
+
+                # Recompute dx, dy with wrapping
+                dx = px - self.playerx
+                if dx > self.screen_width / 2:
+                    dx -= self.screen_width
+                elif dx < -self.screen_width / 2:
+                    dx += self.screen_width
+                dy = py - player_y_screen
+
+                rel_x = dx / float(self.screen_width)
+                rel_y = dy / float(self.screen_height)
+
+                # 0=Green, 1=Blue, 2=Red
+                type_vec = [0.0, 0.0, 0.0]
+                if p_type in (0, 1, 2):
+                    type_vec[p_type] = 1.0
+
+                # broken_flag only if platform is Red
+                broken_flag = float(p_broken) if p_type == 2 else 0.0
+
+                # ------------------------------
+                # has_spring = 1.0 if a spring is "on" this platform
+                # ------------------------------
+                has_spring = 0.0
+                SPRING_THRESHOLD = 30.0
+                for s in self.springs:
+                    # s might be [sx, sy, spring_state]
+                    sx = s[0]
+                    sy = s[1] - self.cameray
+                    # Compare to (px, py)
+                    # Possibly also use wrapping on sx if needed
+                    dx_s = sx - px
+                    if dx_s > self.screen_width / 2:
+                        dx_s -= self.screen_width
+                    elif dx_s < -self.screen_width / 2:
+                        dx_s += self.screen_width
+                    dy_s = sy - py
+                    spring_dist = math.sqrt(dx_s*dx_s + dy_s*dy_s)
+                    if spring_dist < SPRING_THRESHOLD:
+                        has_spring = 1.0
+                        break
+
+                # Combine into one sub-vector for this platform
+                platform_features += [
+                    rel_x,
+                    rel_y,
+                    type_vec[0],  # is_green
+                    type_vec[1],  # is_blue
+                    type_vec[2],  # is_red
+                    broken_flag,
+                    has_spring
+                ]
+            else:
+                # If we don't have enough platforms, pad with zeros
+                platform_features += [0.0]*7
+
+        # --------------------------
+        # 3) NEAREST MONSTERS (OPTIONAL)
+        # --------------------------
+
+        monsters_data = []
         for m in self.monsters:
-            monster_y = m[1] - self.cameray
-            if 0 <= monster_y <= 800:
-                visible_monsters.append({
-                    'x': m[0],
-                    'y': monster_y,
-                    'state': m[2]  # Monster state
-                })
-        features['monsters'] = visible_monsters
+            mx = m[0]
+            my = m[1] - self.cameray
+            # Optional: m[2] might be monster state or type
+            m_state = m[2]
 
-        return features
+            dx = mx - self.playerx
+            # wrap horizontally if needed
+            if dx > self.screen_width / 2:
+                dx -= self.screen_width
+            elif dx < -self.screen_width / 2:
+                dx += self.screen_width
+
+            dy = my - player_y_screen
+            dist = math.sqrt(dx*dx + dy*dy)
+            monsters_data.append((dist, mx, my, m_state))
+
+        # Sort and pick closest 3
+        max_monsters = 3
+        monsters_data.sort(key=lambda x: x[0])
+        nearest_monsters = monsters_data[:max_monsters]
+
+        monster_features = []
+        for i in range(max_monsters):
+            if i < len(nearest_monsters):
+                dist, mx, my, m_state = nearest_monsters[i]
+                dx = mx - self.playerx
+                if dx > self.screen_width / 2:
+                    dx -= self.screen_width
+                elif dx < -self.screen_width / 2:
+                    dx += self.screen_width
+                dy = my - player_y_screen
+
+                rel_mx = dx / float(self.screen_width)
+                rel_my = dy / float(self.screen_height)
+                # Just store (rel_mx, rel_my, m_state) for each monster
+                monster_features += [rel_mx, rel_my, float(m_state)]
+            else:
+                monster_features += [0.0, 0.0, 0.0]
+
+        # --------------------------
+        # 4) CONCATENATE INTO A SINGLE FEATURE VECTOR
+        # --------------------------
+        features = agent_features + platform_features + monster_features
+        features_array = np.array(features, dtype=np.float32)
+        return features_array
+    # player_screen_y = self.playery - self.cameray
+    # platforms_above = [p for p in self.platforms if (
+    #     p[1] - self.cameray) < player_screen_y]
+    # platforms_above.sort(key=lambda x: x[1])  # Sort by actual platform y
+
+    # plat_features = []
+    # for i in range(3):
+    #     if i < len(platforms_above):
+    #         px = platforms_above[i][0] / float(self.screen_width)
+    #         py = (platforms_above[i][1] -
+    #               self.cameray) / float(self.screen_height)
+    #         # p[2] is the platform type: 0=green, 1=blue(moving), 2=red(breaking)
+    #         # normalize type to [0, 0.5, 1.0]
+    #         p_type = platforms_above[i][2] / 2.0
+    #         plat_features += [px, py, p_type]
+    #     else:
+    #         # If fewer than 3 platforms are available, pad with zeros
+    #         plat_features += [0.0, 0.0, 0.0]
+
+    # features = np.array([
+    #     player_x_norm,
+    #     player_y_norm,
+    #     x_velocity_norm,
+    #     jump_norm,
+    #     gravity_norm
+    # ] + plat_features, dtype=np.float32)
+
+    # return features
+
+    def getCurrentFrame(self):
+
+        image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+        return image_data
+
+    # def getFeatures(self):
+    #     features = {}
+    #     x = 0
+    #     features['player_x'] = self.playerx
+    #     features['player_y'] = self.playery - \
+    #         self.cameray  # Adjusted for camera
+    #     features['player_xmovement'] = self.xmovement
+    #     features['player_ymovement'] = - \
+    #         self.jump if self.jump else self.gravity
+    #     features['score'] = self.score
+
+    #     # Platforms that are currently visible on the screen
+    #     visible_platforms = []
+    #     for p in self.platforms:
+    #         platform_y = p[1] - self.cameray
+    #         if 0 <= platform_y <= 800:  # Screen height is 800 pixels
+    #             visible_platforms.append({
+    #                 'x': p[0],
+    #                 'y': platform_y,
+    #                 'type': p[2],  # Platform type: 0-green, 1-blue, 2-red
+    #                 'state': p[3]  # State for moving/broken platforms
+    #             })
+    #             x += 1
+    #     # Sort platforms by y-coordinate
+    #     visible_platforms.sort(key=lambda p: p['y'])
+    #     # Include all visible platforms
+    #     features['platforms'] = visible_platforms
+    #     # print(x)
+    #     # Visible springs
+    #     visible_springs = []
+    #     for s in self.springs:
+    #         spring_y = s[1] - self.cameray
+    #         if 0 <= spring_y <= 800:
+    #             visible_springs.append({
+    #                 'x': s[0],
+    #                 'y': spring_y,
+    #                 'state': s[2]  # Spring state
+    #             })
+    #     features['springs'] = visible_springs
+
+    #     # Visible monsters
+    #     visible_monsters = []
+    #     for m in self.monsters:
+    #         monster_y = m[1] - self.cameray
+    #         if 0 <= monster_y <= 800:
+    #             visible_monsters.append({
+    #                 'x': m[0],
+    #                 'y': monster_y,
+    #                 'state': m[2]  # Monster state
+    #             })
+    #     features['monsters'] = visible_monsters
+
+    #     return features
 
     def playStep(self, actions):
-        """
-        - actions = ['ACTION_LEFT', 'NO_ACTION', 'ACTION_RIGHT']
-        - Param:
-            - actions: a list that contains three boolean values.
-        - Returns:
-            - reward: (int), terminal: (bool), score: (int), features: (dict)
-        """
         last_cameray = self.cameray
         terminal = False
-        reward = formulate_reward(self.reward_type, "DEFAULT")
+        reward = formulate_reward(self.reward_type, "ALIVE")
         return_score = self.score
 
         pygame.display.flip()
         self.screen.fill((255, 255, 255))
         self.FPSCLOCK.tick(self.FPS)
-        self.frame_count += 1
-        if self.frame_count % self.render_skip == 0:
-            pygame.display.flip()
+        # self.frame_count += 1
+        # if self.frame_count % self.render_skip == 0:
+        #     pygame.display.flip()
         for event in pygame.event.get():
             if event.type == QUIT:
                 sys.exit()
@@ -445,17 +653,13 @@ class DoodleJump:
         pygame.display.flip()
         # if not terminal:
         #     features = self.getFeatures()
+        actual_fps = self.FPSCLOCK.get_fps()
+        # print(f"Actual FPS: {actual_fps}")
 
         return reward, terminal, return_score
 
     def gameReboot(self):
-        """
-            - No Params
-            - Returns:
-                - old score before the reboot functions is called
-            - resets all elements of the game
-            - to be called when agent dies
-        """
+
         old_score = self.score
         self.cameray = 0
         self.score = 0
@@ -471,16 +675,11 @@ class DoodleJump:
 
     def run(self):
         clock = pygame.time.Clock()
-        x = 0
+        # x = 0
         while True:
             self.screen.fill((255, 255, 255))
             clock.tick(60)
-            if (x == 0):
-                f = self.getFeatures()
-                print(f)
-                print('--------------------------')
-                print(f['platforms'][0]['x'])
-                x += 1
+
             for event in pygame.event.get():
                 if event.type == QUIT:
                     sys.exit()
