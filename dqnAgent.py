@@ -193,11 +193,11 @@ def train(game, args, writer):
             if score > record:
                 record = score
                 # Save the best model yet
-                agent.save_model(file_name="model_best.pth", model_folder_path="./model")
+                agent.network.save(file_name="model_best.pth", model_folder_path="./model")
             
             if agent.game_counter % 100 == 0:
                 # Save model every 100 games
-                agent.save_model(file_name=f"model_{agent.game_counter}.pth", model_folder_path="./model")
+                agent.network.save(file_name=f"model_{agent.game_counter}.pth", model_folder_path="./model")
 
             print(f'Game {agent.game_counter} | Score: {score} | High Score: {record}')
             score_array.append(score)

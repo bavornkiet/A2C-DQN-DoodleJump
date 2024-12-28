@@ -1,7 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.models as models
 import os
+from torch.distributions.categorical import Categorical
+
 
 class Deep_QNet(nn.Module):
     def __init__(self):
@@ -31,10 +34,16 @@ class Deep_QNet(nn.Module):
         file_name = os.path.join(model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
 
+
 class Deep_RQNet(nn.Module):
     def __init__(self):
         super().__init__()
 
+        # In case of LSTM hidden state is a tuple containing both cell state and hidden state
+        # self.hidden = (Variable(torch.zeros(1, 1, 256).float()), Variable(torch.zeros(1, 1, 256).float()))
+
+        # GRU has a single hidden state
+        # self.hidden = Variable(torch.randn(1, 1, 256).float())
         self.conv1 = nn.Conv2d(1, 32, 8, 4, bias=True, padding=2)
         self.maxpool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
         self.conv2 = nn.Conv2d(32, 64, 4, 2, bias=True, padding=1)
@@ -62,28 +71,6 @@ class Deep_RQNet(nn.Module):
         return fc2_res
 
     def save(self, file_name='model.pth', model_folder_path='./model_drqn'):
-        os.makedirs(model_folder_path, exist_ok=True)
-        file_name = os.path.join(model_folder_path, file_name)
-        torch.save(self.state_dict(), file_name)
-    def __init__(self):
-        super().__init__()
-        mnasnet = models.mnasnet1_0(pretrained=True)
-        features = nn.ModuleList(mnasnet.children())[:-1]
-        self.features = nn.Sequential(*features)
-        self.in_features = 1280
-        self.fc_res = nn.Linear(self.in_features, 3)
-        self.classifier = nn.Sequential(mnasnet.classifier[0], self.fc_res)
-    
-    def forward(self, x):
-        x = x.view(-1, 3, 224, 224)
-        x = self.features(x)
-        # Equivalent to global avgpool and removing H and W dimensions.
-        x = x.mean([2, 3])
-        flattened_res = torch.reshape(x, (-1, self.in_features))
-        x = self.classifier(flattened_res)
-        return x
-    
-    def save(self, file_name='model.pth', model_folder_path='./model_mnasnet'):
         os.makedirs(model_folder_path, exist_ok=True)
         file_name = os.path.join(model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
