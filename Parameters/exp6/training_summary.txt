@@ -1,0 +1,12 @@
+===== Training Summary =====
+Experiment Name: exp6
+Total Training Time: 6704.56 s
+Max Episodes: 500
+Learning Rate: 0.001
+Reward Type: 2 
+Gamma: 0.99
+Best Score Achieved: 35300
+Mean Score: 5196.80
+Mean Reward: 600.22
+Number of Episodes: 500
+===========================
