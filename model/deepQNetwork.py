@@ -35,11 +35,6 @@ class Deep_RQNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # In case of LSTM hidden state is a tuple containing both cell state and hidden state
-        # self.hidden = (Variable(torch.zeros(1, 1, 256).float()), Variable(torch.zeros(1, 1, 256).float()))
-
-        # GRU has a single hidden state
-        # self.hidden = Variable(torch.randn(1, 1, 256).float())
         self.conv1 = nn.Conv2d(1, 32, 8, 4, bias=True, padding=2)
         self.maxpool1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
         self.conv2 = nn.Conv2d(32, 64, 4, 2, bias=True, padding=1)
@@ -70,53 +65,6 @@ class Deep_RQNet(nn.Module):
         os.makedirs(model_folder_path, exist_ok=True)
         file_name = os.path.join(model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
-        
-class DQ_Resnet18(nn.Module):
-    def __init__(self):
-        super().__init__()
-        resnet18 = models.resnet18(pretrained=True)
-        features = nn.ModuleList(resnet18.children())[:-1]
-        self.features = nn.Sequential(*features)
-        self.in_features = resnet18.fc.in_features
-        self.fc_res = nn.Linear(self.in_features, 3)
-    
-    def forward(self, x):
-        x = x.view(-1, 3, 224, 224)
-        x = self.features(x)
-        flattened_res = torch.reshape(x, (-1, self.in_features))
-        x = self.fc_res(flattened_res)
-        return x
-    
-    def save(self, file_name='model.pth', model_folder_path='./model_resnet18'):
-        os.makedirs(model_folder_path, exist_ok=True)
-        file_name = os.path.join(model_folder_path, file_name)
-        torch.save(self.state_dict(), file_name)
-
-class DQ_Mobilenet(nn.Module):
-    def __init__(self):
-        super().__init__()
-        mobilenet = models.mobilenet_v3_large(pretrained=True)
-        features = nn.ModuleList(mobilenet.children())[:-1]
-        self.features = nn.Sequential(*features)
-        classifier = nn.ModuleList(mobilenet.classifier.children())[:-1]
-        self.classifier = nn.Sequential(*classifier)
-        self.in_features = 960
-        self.fc_res = nn.Linear(1280, 3)
-    
-    def forward(self, x):
-        x = x.view(-1, 3, 224, 224)
-        x = self.features(x)
-        flattened_res = torch.reshape(x, (-1, self.in_features))
-        x = self.classifier(flattened_res)
-        x = self.fc_res(x)
-        return x
-    
-    def save(self, file_name='model.pth', model_folder_path='./model_mobilenet'):
-        os.makedirs(model_folder_path, exist_ok=True)
-        file_name = os.path.join(model_folder_path, file_name)
-        torch.save(self.state_dict(), file_name)
-
-class DQ_Mnasnet(nn.Module):
     def __init__(self):
         super().__init__()
         mnasnet = models.mnasnet1_0(pretrained=True)

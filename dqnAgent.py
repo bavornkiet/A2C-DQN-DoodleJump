@@ -8,146 +8,136 @@ from scipy.stats import trim_mean
 import numpy as np
 from collections import deque
 from game.game import DoodleJump
-from model.deepQNetwork import Deep_QNet, Deep_RQNet, DQ_Resnet18, DQ_Mobilenet, DQ_Mnasnet
+from model.deepQNetwork import Deep_QNet, Deep_RQNet
 from model.dqnTrainer import QTrainer
 from helper import write_model_params
 from torch.utils.tensorboard import SummaryWriter
 
 class Agent:
-    def __init__(self, args):
-        self.n_games = 0
-        # self.epsilon = 0
-        self.ctr = 1
-        seed = args.seed
-        self.exploration = args.exploration
-        os.environ['PYTHONHASHSEED'] = str(seed)
-        # Torch RNG
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        # Python RNG
-        np.random.seed(seed)
-        random.seed(seed)
-        self.store_frames = args.store_frames
-        self.image_h = args.height
-        self.image_w = args.width
-        self.image_c = args.channels
-        self.memory = deque(maxlen=args.max_memory)
-        self.device = torch.device("cpu")
-        self.gamma = args.gamma
-        self.batch_size = args.batch_size
-        self.lr = args.learning_rate
-        self.steps = 0
-        self.exploration_type = args.explore
-        self.decay_factor = args.decay_factor
-        self.epsilon = args.epsilon
-        self.eulers_constant = 2.71828
+    def __init__(self, config):
+        self.game_counter = 0
+        self.step_counter = 1
+        random_seed = config.seed
+        self.explore_limit = config.exploration
+        os.environ['PYTHONHASHSEED'] = str(random_seed)
         
-        if args.explore == "epsilon_g_decay_exp":
-            self.epsilon = 1
+        torch.manual_seed(random_seed)
+        torch.cuda.manual_seed(random_seed)
+        torch.cuda.manual_seed_all(random_seed)
+        
+        np.random.seed(random_seed)
+        random.seed(random_seed)
+        
+        self.save_frames = config.store_frames
+        self.img_height = config.height
+        self.img_width = config.width
+        self.img_channels = config.channels
+        self.replay_memory = deque(maxlen=config.max_memory)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.discount_factor = config.gamma
+        self.batch_size = config.batch_size
+        self.learning_rate = config.learning_rate
+        self.steps_done = 0
+        self.exploration_strategy = config.explore
+        self.decay_rate = config.decay_factor
+        self.epsilon_value = config.epsilon
+        self.e_constant = 2.71828
+        
+        if config.explore == "epsilon_g_decay_exp":
+            self.epsilon_value = 1
             
-        if args.model=="dqn":
-            self.model = Deep_QNet()
-        elif args.model=="drqn":
-            self.model = Deep_RQNet()
-        elif args.model=='resnet':
-            self.model = DQ_Resnet18()
-        elif args.model=='mobilenet':
-            self.model = DQ_Mobilenet()
-        elif args.model=='mnasnet':
-            self.model = DQ_Mnasnet()
+        if config.model == "dqn":
+            self.network = Deep_QNet()
+        elif config.model == "drqn":
+            self.network = Deep_RQNet()
 
-        if args.model_path or args.test:
-            self.model.load_state_dict(torch.load(args.model_path, map_location=torch.device('cpu')), strict=False)
-        self.trainer = QTrainer(model=self.model, lr=self.lr, gamma=self.gamma, device=self.device, 
-                                num_channels=self.image_c, attack_eps=args.attack_eps)
+        self.network = self.network.to(self.device)
         
+        if config.model_path or config.test:
+            self.network.load_state_dict(torch.load(config.model_path, map_location=self.device), strict=False)
+            
+        self.trainer = QTrainer(model=self.network, lr=self.learning_rate, gamma=self.discount_factor, device=self.device, 
+                                num_channels=self.img_channels, attack_eps=config.attack_eps)
         
-    def preprocess(self, state):
-        
-        # resize the image and then rotate
-        img = cv2.resize(state, (self.image_w, self.image_h))
-        M = cv2.getRotationMatrix2D((self.image_w / 2, self.image_h / 2), 270, 1.0)
-        img = cv2.warpAffine(img, M, (self.image_h, self.image_w))
+    def process_frame(self, frame):
+        resized_frame = cv2.resize(frame, (self.img_width, self.img_height))
+        rotation_matrix = cv2.getRotationMatrix2D((self.img_width / 2, self.img_height / 2), 270, 1.0)
+        rotated_frame = cv2.warpAffine(resized_frame, rotation_matrix, (self.img_height, self.img_width))
 
-        if self.store_frames:
+        if self.save_frames:
             os.makedirs("./image_dump", exist_ok=True)
-            cv2.imwrite("./image_dump/"+str(self.ctr)+".jpg", img)
-            self.ctr+=1
+            cv2.imwrite(f"./image_dump/{self.step_counter}.jpg", rotated_frame)
+            self.step_counter += 1
             
         imagenet_mean = [0.485, 0.456, 0.406]
         imagenet_std = [0.229, 0.224, 0.225]
-        if self.image_c == 1:
-            # convert the image to grayscale
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            # normalize the image with imagenet mean and std values
-            img = ((img/255.0) - np.mean(imagenet_mean))/np.mean(imagenet_std)
-        else:
-            # normalize the image with imagenet mean and std values
-            img = ((img/255.0) - imagenet_mean)/imagenet_std
-            # change the shape from WxHxC to CxHxW for pytorch tensor
-            img = img.transpose((2, 0, 1))
         
-        # Add a axis for converting image to shape: 1xCxHxW
-        img = np.expand_dims(img, axis=0)
-            
-        return img
-
-    def get_state(self, game):
-        state = game.getCurrentFrame()
-        return self.preprocess(state)
-
-    def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done)) # popleft if MAX_MEMORY is reached
-
-    def train_long_memory(self):
-        if len(self.memory) > self.batch_size:
-            mini_sample = random.sample(self.memory, self.batch_size) # list of tuples
+        if self.img_channels == 1:
+            grayscale_img = cv2.cvtColor(rotated_frame, cv2.COLOR_BGR2GRAY)
+            normalized_img = ((grayscale_img / 255.0) - np.mean(imagenet_mean)) / np.mean(imagenet_std)
         else:
-            mini_sample = self.memory
-        states, actions, rewards, next_states, dones = zip(*mini_sample)
-        self.model.train()
-        return self.trainer.train_step(states, actions, rewards, next_states, dones)
+            normalized_img = ((rotated_frame / 255.0) - imagenet_mean) / imagenet_std
+            normalized_img = normalized_img.transpose((2, 0, 1))
+        
+        final_img = np.expand_dims(normalized_img, axis=0)
+        return final_img
 
-    def train_short_memory(self, state, action, reward, next_state, done):
-        self.model.train()
-        return self.trainer.train_step(state, action, reward, next_state, done)
-    
-    def should_explore(self, test_mode):
-        self.steps += 1
-        r = random.random()
-        if test_mode:
+    def get_game_state(self, game_instance):
+        current_frame = game_instance.getPixelFrame()
+        return self.process_frame(current_frame)
+
+    def evaluate_exploration(self, testing_mode):
+        self.steps_done += 1
+        random_chance = random.random()
+        if testing_mode:
             return False
-        if self.exploration_type == "epsilon_g":
+        if self.exploration_strategy == "epsilon_g":
             pass
-        elif self.exploration_type == "epsilon_g_decay_exp":
-            self.epsilon = self.epsilon * pow((1.0 - self.decay_factor), self.steps)
-        elif self.exploration_type == "epsilon_g_decay_exp_cur":
-            self.epsilon = self.decay_factor * pow(self.eulers_constant, -self.steps)
+        elif self.exploration_strategy == "epsilon_g_decay_exp":
+            self.epsilon_value *= pow((1.0 - self.decay_rate), self.steps_done)
+        elif self.exploration_strategy == "epsilon_g_decay_exp_cur":
+            self.epsilon_value = self.decay_rate * pow(self.e_constant, -self.steps_done)
     
-        if r > self.epsilon:
-                return True
+        if random_chance > self.epsilon_value:
+            return True
         return False
-        
-    def get_action(self, state, test_mode=False):
-        final_move = [0,0,0]  
-        if self.should_explore(test_mode):
-            move = random.randint(0, 2)
-            final_move[move] = 1
+    
+    def train_replay_memory(self):
+        if len(self.replay_memory) > self.batch_size:
+            mini_batch = random.sample(self.replay_memory, self.batch_size)
         else:
-            state0 = torch.tensor(state, dtype=torch.float).to(self.device)
-            self.model.eval()
+            mini_batch = self.replay_memory
+        
+        states, actions, rewards, next_states, game_done_flags = zip(*mini_batch)
+        self.network.train()
+        return self.trainer.train_step(states, actions, rewards, next_states, game_done_flags)
+
+    def train_single_step(self, state, action, reward, next_state, game_done):
+        self.network.train()
+        return self.trainer.train_step(state, action, reward, next_state, game_done)
+    
+    def choose_action(self, state, testing_mode=False):
+        action_vector = [0, 0, 0]  
+        if self.evaluate_exploration(testing_mode):
+            selected_action = random.randint(0, 2)
+            action_vector[selected_action] = 1
+        else:
+            state_tensor = torch.tensor(state, dtype=torch.float).to(self.device)
+            self.network.eval()
             with torch.no_grad():
-                prediction = self.model(state0)
-            move = torch.argmax(prediction).item()
-            final_move[move] = 1
+                predictions = self.network(state_tensor)
+            selected_action = torch.argmax(predictions).item()
+            action_vector[selected_action] = 1
 
-        return final_move
-
+        return action_vector
+    
+    def save_experience(self, current_state, action, reward, next_state, game_done):
+        self.replay_memory.append((current_state, action, reward, next_state, game_done))
 
 def train(game, args, writer):
     if args.macos:
-        os.environ['KMP_DUPLICATE_LIB_OK']='True'
+        os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+    
     sum_rewards = 0
     sum_short_loss = 0
     total_score = 0
@@ -156,111 +146,122 @@ def train(game, args, writer):
     record = 0
     loop_ctr = 0
     agent = Agent(args)
+    
     dummy_input = torch.rand(1, args.channels, args.height, args.width).to(agent.device)
-    writer.add_graph(agent.model, dummy_input)
+    writer.add_graph(agent.network, dummy_input)
     print("Now playing")
-
-    while agent.n_games != args.max_games:
+    
+    while agent.game_counter != args.max_games:
         loop_ctr += 1
-        # get old state
-        state_old = agent.get_state(game)
+        
+        # Get old state
+        state_old = agent.get_game_state(game_instance=game)
 
-        # get move
-        final_move = agent.get_action(state_old)
+        # Get move
+        final_move = agent.choose_action(state_old)
 
-        # perform move and get new state
-        reward, done, score = game.playStep(final_move)
+        # Perform move and get new state
+        reward, done, score = game.agentPlay(final_move)
+        state_new = agent.get_game_state(game_instance=game)
 
-        state_new = agent.get_state(game)
         reward_array.append(reward)
         sum_rewards += reward
         writer.add_scalar('Reward/curr_reward', reward, loop_ctr)
 
-        # train short memory
-        short_loss = agent.train_short_memory(state_old, final_move, reward, state_new, [done])
+        # Train short memory
+        short_loss = agent.train_single_step(state_old, final_move, reward, state_new, done)
         writer.add_scalar('Game/Short_Episodes', loop_ctr, loop_ctr)
         sum_short_loss += short_loss
 
-        # remember
-        agent.remember(state_old, final_move, reward, state_new, done)
+        # save_experience
+        agent.save_experience(state_old, final_move, reward, state_new, done)
 
-        if loop_ctr%25 == 0:
-            writer.add_scalar('Loss/Short_train', sum_short_loss/loop_ctr, loop_ctr)
-            writer.add_scalar('Reward/mean_reward', sum_rewards/loop_ctr, loop_ctr)
+        if loop_ctr % 25 == 0:
+            writer.add_scalar('Loss/Short_train', sum_short_loss / loop_ctr, loop_ctr)
+            writer.add_scalar('Reward/mean_reward', sum_rewards / loop_ctr, loop_ctr)
 
         if done:
-            # train long memory, plot result
+            # Train long memory, plot result
             game.gameReboot()
-            agent.n_games += 1
-            long_loss = agent.train_long_memory()
-            writer.add_scalar('Loss/Long_train', long_loss, agent.n_games)
-            writer.add_scalar('Game/Episodes', agent.n_games, agent.n_games)
+            agent.game_counter += 1
+            long_loss = agent.train_replay_memory()
+            writer.add_scalar('Loss/Long_train', long_loss, agent.game_counter)
+            writer.add_scalar('Game/Episodes', agent.game_counter, agent.game_counter)
 
             if score > record:
                 record = score
-                # save the best model yet
-                agent.model.save(file_name="model_best.pth", model_folder_path="./model"+hyper_params+dstr)
+                # Save the best model yet
+                agent.network.save(file_name="model_best.pth", model_folder_path="./model")
             
-            if agent.n_games%100 == 0:
-                # save model per 100 games
-                agent.model.save(file_name="model_"+str(agent.n_games)+".pth", model_folder_path="./model"+hyper_params+dstr)
+            if agent.game_counter % 100 == 0:
+                # Save model every 100 games
+                agent.network.save(file_name=f"model_{agent.game_counter}.pth", model_folder_path="./model")
 
-            print('Game', agent.n_games, 'Score', score, 'Record:', record)
-            writer.add_scalar('Score/High_Score', record, agent.n_games)
+            print('Game', agent.game_counter, 'Score', score, 'Record:', record)
+            writer.add_scalar('Score/High_Score', record, agent.game_counter)
             score_array.append(score)
             total_score += score
-            mean_score = total_score / agent.n_games
-            writer.add_scalars('Score', {'Curr_Score':score, 'Mean_Score': mean_score}, agent.n_games)
-            write_model_params(agent.model, agent.n_games, writer)
+            mean_score = total_score / agent.game_counter
+            writer.add_scalars('Score', {'Curr_Score': score, 'Mean_Score': mean_score}, agent.game_counter)
+            write_model_params(agent.network, agent.game_counter, writer)
 
     trimmed_avg_score = trim_mean(score_array, 0.1)
     trimmed_avg_reward = trim_mean(reward_array, 0.1)
     print('Mean trimmed score: ', trimmed_avg_score)
     print('Mean trimmed reward: ', trimmed_avg_reward)
-    writer.add_hparams(hparam_dict=vars(args),
-                        metric_dict={'long_loss_loss': long_loss,
-                                     'mean_short_loss': sum_short_loss/loop_ctr,
-                                     'mean_reward': sum_rewards/loop_ctr,
-                                     'trimmed_avg_score': trimmed_avg_score,
-                                     'trimmed_avg_reward': trimmed_avg_reward,
-                                     'high_score': record,
-                                     'mean_score': mean_score
-                                     })
+    writer.add_hparams(
+        hparam_dict=vars(args),
+        metric_dict={
+            'long_loss_loss': long_loss,
+            'mean_short_loss': sum_short_loss / loop_ctr,
+            'mean_reward': sum_rewards / loop_ctr,
+            'trimmed_avg_score': trimmed_avg_score,
+            'trimmed_avg_reward': trimmed_avg_reward,
+            'high_score': record,
+            'mean_score': mean_score
+        }
+    )
 
 def test(game, args):
     if args.macos:
-        os.environ['KMP_DUPLICATE_LIB_OK']='True'
+        os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
     record = 0
     cum_score = 0
     agent = Agent(args)
     print("Now playing")
+
+    with open("test_logs.txt", "w") as f:
+        f.write("Now playing\n")
     
-    f = open("test_logs.txt", "w")
-    f.write("Now playing")
-    f.close()
-    
-    while agent.n_games < args.max_games:        
+    while agent.game_counter < args.max_games:
         if args.attack:
-            state = agent.get_state(game) # original
-            adv_manip = agent.trainer.create_adv_state(state) #manipulated
-            final_move = agent.get_action(torch.tensor(state).to(agent.device) + adv_manip, test_mode=True)
-            reward, done, score = game.playStep(final_move)
+            state = agent.get_game_state(game)  # Original state
+            adv_manip = agent.trainer.create_adv_state(state)  # Manipulated state
+            final_move = agent.choose_action(state + adv_manip, test_mode=True)
+            reward, done, score = game.agentPlay(final_move)
         else:
-            state_old = agent.get_state(game)
-            final_move = agent.get_action(state_old, test_mode=True)
-            reward, done, score = game.playStep(final_move)
-            
+            state_old = agent.get_game_state(game)
+            final_move = agent.choose_action(state_old, test_mode=True)
+            reward, done, score = game.agentPlay(final_move)
+
         if done:
-            agent.n_games += 1
+            agent.game_counter += 1
             cum_score += score
             game.gameReboot()
+
             if score > record:
                 record = score
-            f = open("test_logs.txt", "a")
-            f.write('Game: '+str(agent.n_games)+' Score: '+str(score)+' Record: '+str(record)+' Mean Score: '+str(cum_score/agent.n_games)+'\n')
-            f.close()
-            print('Game', agent.n_games, 'Score', score, 'Record:', record, 'Mean Score:', cum_score/agent.n_games)
-    
+            
+            with open("test_logs.txt", "a") as f:
+                f.write(
+                    f"Game: {agent.game_counter} Score: {score} Record: {record} "
+                    f"Mean Score: {cum_score / agent.game_counter}\n"
+                )
+            print(
+                f"Game {agent.game_counter} Score {score} Record {record} "
+                f"Mean Score: {cum_score / agent.game_counter}"
+            )
 
 if __name__ == "__main__":
 
@@ -268,7 +269,6 @@ if __name__ == "__main__":
     parser.add_argument("--macos", action="store_true", help="select model to train the agent")
     parser.add_argument("--human", action="store_true", help="playing the game manually without agent")
     parser.add_argument("--test", action="store_true", help="playing the game with a trained agent")
-    parser.add_argument("-d", "--difficulty", type=str, default="EASY", choices=["EASY", "MEDIUM", "HARD"], help="select difficulty of the game")
     parser.add_argument("-m", "--model", type=str, default="dqn", choices=["dqn", "drqn", "resnet", "mobilenet", "mnasnet"], help="select model to train the agent")
     parser.add_argument("-p", "--model_path", type=str, help="path to weights of an earlier trained model")
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.001, help="set learning rate for training the model")
@@ -291,14 +291,14 @@ if __name__ == "__main__":
     parser.add_argument("--attack_eps", type=float, default=0.3, help="epsilon value for the fgsm attack")
     args = parser.parse_args()
     
-    game = DoodleJump(difficulty=args.difficulty, server=args.server, reward_type=args.reward_type)
+    game = DoodleJump(server=args.server, reward_type=args.reward_type)
 
     if args.human:
         game.run()
     elif args.test:
         test(game, args)
     else:
-        hyper_params = "_d_"+args.difficulty+"_m_"+args.model+"_lr_"+str(args.learning_rate)+"_g_"+str(args.gamma)+"_mem_"+str(args.max_memory)+"_batch_"+str(args.batch_size)
+        hyper_params = "_m_"+args.model+"_lr_"+str(args.learning_rate)+"_g_"+str(args.gamma)+"_mem_"+str(args.max_memory)+"_batch_"+str(args.batch_size)
         arg_dict = vars(args)
 
         dstr = datetime.datetime.now().strftime("_dt-%Y-%m-%d-%H-%M-%S")

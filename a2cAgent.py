@@ -53,7 +53,7 @@ class Runner():
         self.episode_rewards = []
         self.total_score = 0
         ''''''
-        self.n_games = 0
+        self.game_counter = 0
         self.epsilon = 0
         self.ctr = 1
         seed = args.seed
@@ -292,7 +292,7 @@ class Runner():
                               self.mean_reward, global_step=self.steps)
 
             if self.done:
-                self.n_games += 1
+                self.game_counter += 1
                 self.episode_rewards.append(self.episode_reward)
                 if len(self.episode_rewards) % 10 == 0:
                     print("Episode:", len(self.episode_rewards),
@@ -312,25 +312,25 @@ class Runner():
                     actorcritic.save(file_name=model_filename,
                                      model_folder_path="./Parameters")
 
-                if self.n_games % 100 == 0:
+                if self.game_counter % 100 == 0:
                     # Save the model periodically
                     model_filename = (
-                        f"a2c_model_{self.n_games}" +
+                        f"a2c_model_{self.game_counter}" +
                         f"{self.hyper_params}" +
                         f"{self.dstr}.pth"
                     )
                     actorcritic.save(file_name=model_filename,
                                      model_folder_path="./Parameters")
 
-                print('Game', self.n_games, 'Score',
+                print('Game', self.game_counter, 'Score',
                       score, 'Record:', self.record)
                 writer.add_scalar('Score/High_Score',
-                                  self.record, self.n_games)
+                                  self.record, self.game_counter)
 
                 self.total_score += score
-                self.mean_score = self.total_score / agent.n_games
+                self.mean_score = self.total_score / agent.game_counter
                 writer.add_scalar('Score/Mean_Score',
-                                  self.mean_score, self.n_games)
+                                  self.mean_score, self.game_counter)
         return memory
 
 
@@ -346,7 +346,7 @@ def test(game, args):
     agent = Runner(game)
     print("Now testing")
 
-    while agent.n_games != args.max_games:
+    while agent.game_counter != args.max_games:
         state_old = agent.get_state()
         state_tensor = t(state_old).unsqueeze(0).to(agent.device)
         dists = actorcritic(state_tensor)[0]
@@ -357,11 +357,11 @@ def test(game, args):
         final_move[np.argmax(actions_clipped)] = 1
         reward, done, score = game.playStep(final_move)
         if done:
-            agent.n_games += 1
+            agent.game_counter += 1
             game.gameReboot()
             if score > record:
                 record = score
-            print('Game', agent.n_games, 'Score', score, 'Record:', record)
+            print('Game', agent.game_counter, 'Score', score, 'Record:', record)
 # Argument Parsing: Parses command-line arguments for configuration.
 # Game and Agent Initialization: Sets up the game and agent.
 # Logging Setup: Configures TensorBoard logging.
@@ -460,7 +460,7 @@ if __name__ == '__main__':
 
         steps_on_memory = 16
         start_time = time.time()
-        while agent.n_games != args.max_games:
+        while agent.game_counter != args.max_games:
             memory = agent.run(steps_on_memory)
             learner.learn(memory, agent.steps, writer, discount_rewards=False)
         end_time = time.time()
