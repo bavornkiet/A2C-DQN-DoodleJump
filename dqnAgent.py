@@ -137,7 +137,7 @@ class Agent:
 def train(game, args, writer):
     if args.macos:
         os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    
+
     sum_rewards = 0
     sum_short_loss = 0
     total_score = 0
@@ -166,45 +166,53 @@ def train(game, args, writer):
 
         reward_array.append(reward)
         sum_rewards += reward
-        writer.add_scalar('Reward/curr_reward', reward, loop_ctr)
 
         # Train short memory
         short_loss = agent.train_single_step(state_old, final_move, reward, state_new, done)
-        writer.add_scalar('Game/Short_Episodes', loop_ctr, loop_ctr)
         sum_short_loss += short_loss
 
-        # save_experience
+        # Save experience to memory
         agent.save_experience(state_old, final_move, reward, state_new, done)
 
+        # Log metrics every 25 steps
         if loop_ctr % 25 == 0:
             writer.add_scalar('Loss/Short_train', sum_short_loss / loop_ctr, loop_ctr)
             writer.add_scalar('Reward/mean_reward', sum_rewards / loop_ctr, loop_ctr)
 
         if done:
-            # Train long memory, plot result
+            # Train long memory, reset the game, and update metrics
             game.gameReboot()
             agent.game_counter += 1
             long_loss = agent.train_replay_memory()
+
+            # Log metrics for the episode
             writer.add_scalar('Loss/Long_train', long_loss, agent.game_counter)
-            writer.add_scalar('Game/Episodes', agent.game_counter, agent.game_counter)
+            writer.add_scalar('Reward/Total_rewards', sum_rewards, agent.game_counter)
+            writer.add_scalar('Game/High_Score', record, agent.game_counter)
 
             if score > record:
                 record = score
                 # Save the best model yet
-                agent.network.save(file_name="model_best.pth", model_folder_path="./model")
+                agent.save_model(file_name="model_best.pth", model_folder_path="./model")
             
             if agent.game_counter % 100 == 0:
                 # Save model every 100 games
-                agent.network.save(file_name=f"model_{agent.game_counter}.pth", model_folder_path="./model")
+                agent.save_model(file_name=f"model_{agent.game_counter}.pth", model_folder_path="./model")
 
-            print('Game', agent.game_counter, 'Score', score, 'Record:', record)
-            writer.add_scalar('Score/High_Score', record, agent.game_counter)
+            print(f'Game {agent.game_counter} | Score: {score} | High Score: {record}')
             score_array.append(score)
             total_score += score
-            mean_score = total_score / agent.game_counter
-            writer.add_scalars('Score', {'Curr_Score': score, 'Mean_Score': mean_score}, agent.game_counter)
-            write_model_params(agent.network, agent.game_counter, writer)
 
+            # Log mean score
+            mean_score = total_score / agent.game_counter
+            writer.add_scalar('Game/Mean_Score', mean_score, agent.game_counter)
+            writer.add_scalars('Game/Scores', {
+                'Current_Score': score,
+                'Mean_Score': mean_score,
+                'High_Score': record
+            }, agent.game_counter)
+
+    # Final metrics logging
     trimmed_avg_score = trim_mean(score_array, 0.1)
     trimmed_avg_reward = trim_mean(reward_array, 0.1)
     print('Mean trimmed score: ', trimmed_avg_score)
@@ -212,13 +220,10 @@ def train(game, args, writer):
     writer.add_hparams(
         hparam_dict=vars(args),
         metric_dict={
-            'long_loss_loss': long_loss,
-            'mean_short_loss': sum_short_loss / loop_ctr,
-            'mean_reward': sum_rewards / loop_ctr,
-            'trimmed_avg_score': trimmed_avg_score,
-            'trimmed_avg_reward': trimmed_avg_reward,
-            'high_score': record,
-            'mean_score': mean_score
+            'Mean_Trimmed_Score': trimmed_avg_score,
+            'Mean_Trimmed_Reward': trimmed_avg_reward,
+            'High_Score': record,
+            'Mean_Score': total_score / agent.game_counter
         }
     )
 
