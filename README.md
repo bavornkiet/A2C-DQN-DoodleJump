@@ -53,9 +53,78 @@ Each agent has a dedicated training script. Use the following commands to train 
 
 ### Feature-Based A2C
 
-To test the Feature-Based 
+To test the Feature-Based A2C
 ```bash
 python a2cAgent.py --test
+```
+Other Commands
+```bash
+python a2cAgent.py
+
+  --learning_rate LEARNING_RATE,
+                        set learning rate for training the model
+  -gamma GAMMA, 
+                        set discount factor for q learning
+  --reward_type {1,2,3}
+                        types of rewards formulation
+  --server              when training on server add this flag to stop the game from rendering
+  --max_games MAX_GAMES
+                        set the max number of games to be played by the agent
+  --experiment_name EXPERIMENT_NAME
+                        set the experiment name (for training)
+```
+
+### Feature-Based DQN
+
+To test the Feature-Based DQN
+```bash
+python dqnAgent.py --test
+```
+Other Commands
+```bash
+python a2cAgent.py
+
+  --learning_rate LEARNING_RATE,
+                        set learning rate for training the model
+  -gamma GAMMA, 
+                        set discount factor for q learning
+  --reward_type {1,2,3}
+                        types of rewards formulation
+  --server              when training on server add this flag to stop the game from rendering
+  --max_games MAX_GAMES
+                        set the max number of games to be played by the agent
+  --experiment_name EXPERIMENT_NAME
+                        set the experiment name (for training)
+```
+
+### Pixel-Based A2C
+
+To test the Pixel-Based A2C
+```bash
+python a2cAgent.py --test
+```
+Other Commands
+```bash
+python a2cAgent.py
+
+  --learning_rate LEARNING_RATE,
+                        set learning rate for training the model
+  -gamma GAMMA, 
+                        set discount factor for q learning
+  --reward_type {1,2,3}
+                        types of rewards formulation
+  --server              when training on server add this flag to stop the game from rendering
+  --max_games MAX_GAMES
+                        set the max number of games to be played by the agent
+  --experiment_name EXPERIMENT_NAME
+                        set the experiment name (for training)
+```
+
+### Pixel-Based DQN
+
+To test the Pixel-Based DQN
+```bash
+python dqnAgent.py --test
 ```
 Other Commands
 ```bash
