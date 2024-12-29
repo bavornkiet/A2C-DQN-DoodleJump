@@ -13,7 +13,7 @@ By employing these algorithms on both pixel data and engineered features, the pr
 
 ### Prerequisites
 
-- **Python**: Version 3.10 is recommended.
+- **Python**: Version 3.10+ is recommended.
 - **Package Manager**: Miniconda or pip must be installed on your machine.
 - **PyTorch**: Install the version compatible with your CUDA setup. Find the appropriate installation command [here](https://pytorch.org/get-started/previous-versions/).
 
@@ -22,7 +22,7 @@ By employing these algorithms on both pixel data and engineered features, the pr
 1. **Clone the Repository**
 
     ```bash
-    git clone https://github.com/yourusername/doodle-jump-rl.git
+    git clone https://github.com/yourusername/ReinforcementGRP86.git
     cd doodle-jump-rl
     ```
 2. **Set Up the Environment**
@@ -47,7 +47,8 @@ By employing these algorithms on both pixel data and engineered features, the pr
     pip install -r requirements.txt
     ```
 
-## Running Agents
+## Usage
+
 
 Each agent has a dedicated training script. Use the following commands to train each agent:
 
