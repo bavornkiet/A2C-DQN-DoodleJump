@@ -8,19 +8,50 @@ This project implements and compares various reinforcement learning (RL) agents 
 - **Advantage Actor-Critic (A2C)**
 
 By employing these algorithms on both pixel data and engineered features, the project aims to analyze and compare their performance across different metrics.
-## Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Training Agents](#training-agents)
-    - [Pixel-Based DQN](#pixel-based-dqn)
-    - [Pixel-Based A2C](#pixel-based-a2c)
-    - [Feature-Based DQN](#feature-based-dqn)
-    - [Feature-Based A2C](#feature-based-a2c)
-  - [Evaluating Agents](#evaluating-agents)
-  - [Comparing Metrics](#comparing-metrics)
-- [Results](#results)
-- [Contributing](#contributing)
-- [License](#license)
+## Getting Started
+
+### Prerequisites
+
+- **Python**: Version 3.10 is recommended.
+- **Package Manager**: Miniconda or pip must be installed on your machine.
+- **PyTorch**: Install the version compatible with your CUDA setup. Find the appropriate installation command [here](https://pytorch.org/get-started/previous-versions/).
+
+### Installation
+
+1. **Clone the Repository**
+
+    ```bash
+    git clone https://github.com/yourusername/doodle-jump-rl.git
+    cd doodle-jump-rl
+    ```
+2. **Set Up the Environment**
+
+    Using **pip**:
+
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
+
+    Or using **Miniconda**:
+
+    ```bash
+    conda create -n doodle-jump-rl python=3.10
+    conda activate doodle-jump-rl
+    ```
+
+3. **Install Dependencies**
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Running Agents
+
+Each agent has a dedicated training script. Use the following commands to train each agent:
+
+### Pixel-Based DQN
+
+```bash
+python train_pixel_dqn.py --config configs/pixel_dqn_config.yaml
