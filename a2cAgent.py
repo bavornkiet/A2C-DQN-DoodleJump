@@ -66,7 +66,6 @@ def log_resource_usage(writer, episode):
     writer.add_scalar('Resource/RAM_Usage', ram_percent, episode)
     writer.add_scalar('Resource/GPU_Usage', gpu_load, episode)
     writer.add_scalar('Resource/GPU_Memory_Used', gpu_memory_used, episode)
-    writer.add_scalar('Resource/GPU_Memory_Total', gpu_memory_total, episode)
 
 
 def parse_args():
@@ -87,14 +86,15 @@ def main():
     args = parse_args()
     device = get_available_device()
     # Create folder structure for saving parameters
-    parameters_folder = os.path.join("Parameters", args.experiment_name)
+    parameters_folder = os.path.join(
+        "Parameters", "gamma_testing", args.experiment_name)
     if not os.path.exists(parameters_folder):
         os.makedirs(parameters_folder)
 
     # Initialize TensorBoard SummaryWriter
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_log_dir = os.path.join(
-        "runs", f"{args.experiment_name}")
+        "runs", "gamma_testing", f"{args.experiment_name}")
     writer = SummaryWriter(log_dir=tensorboard_log_dir)
 
     # Initialize Environment
@@ -154,7 +154,6 @@ def main():
 
                 # 2) Actor forward pass -> raw logits
                 logits = actor(state_t)
-                # Turn logits into probability distribution
                 dist = torch.distributions.Categorical(logits=logits)
                 action = dist.sample()  # sample an action
                 log_prob = dist.log_prob(action)
@@ -163,10 +162,8 @@ def main():
                 value = critic(state_t)  # shape []
 
                 # 4) Step the environment
-                # Convert 'action' from torch Tensor to index
                 action_index = action.item()
-                # We'll map: 0->[1,0,0], 1->[0,1,0], 2->[0,0,1]
-                # Or if your environment takes discrete action directly, do so
+
                 action_list = [0, 0, 0]
                 action_list[action_index] = 1
 
@@ -186,7 +183,6 @@ def main():
                 state = next_state
 
             # ============ End of Episode ==============
-            # Compute the value of the next state (for bootstrap, unless last state was terminal)
             if not env.is_terminal_state():
                 # If not terminal, get critic value for next_state
                 next_state_t = torch.FloatTensor(state).unsqueeze(0).to(device)
@@ -222,6 +218,8 @@ def main():
                 'Training/Mean_Score', mean_score, episode)
             writer.add_scalar(
                 'Training/Mean_Reward', mean_reward, episode)
+            writer.add_scalar(
+                'Training/High_Score', best_score, episode)
 
             if (episode + 1) % 10 == 0:
                 print(f"Episode: {episode+1}, Score: {ep_score}, Reward: {ep_reward}, "
@@ -262,8 +260,8 @@ def main():
 
     else:
         print("Running in test mode. Evaluate agent's performance...")
-        actor_load_path = "Parameters/exp1/model_actor_20241228-003251.pth"
-        critic_load_path = "Parameters/exp1/model_critic_20241228-003251.pth"
+        actor_load_path = "Parameters/reward_testing/expR3-2/model_actor_20241228-210124.pth"
+        critic_load_path = "Parameters/reward_testing/expR3-2/model_critic_20241228-210124.pth"
         actor.load_state_dict(torch.load(actor_load_path, map_location=device))
         critic.load_state_dict(torch.load(
             critic_load_path, map_location=device))
