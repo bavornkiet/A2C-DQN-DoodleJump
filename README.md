@@ -51,13 +51,13 @@ By employing these algorithms on both pixel data and engineered features, the pr
 
 Each agent has a dedicated training script. Use the following commands to train each agent:
 
-### Feature-Based A2C
+## Feature-Based A2C
 
 To test the Feature-Based A2C
 ```bash
 python a2cAgent.py --test
 ```
-Other Commands
+Other Commands for Training
 ```bash
 python a2cAgent.py
 
@@ -74,13 +74,13 @@ python a2cAgent.py
                         set the experiment name (for training)
 ```
 
-### Feature-Based DQN
+## Feature-Based DQN
 
 To test the Feature-Based DQN
 ```bash
 python dqnAgent.py --test
 ```
-Other Commands
+Other Commands for Training
 ```bash
 python a2cAgent.py
 
@@ -97,15 +97,15 @@ python a2cAgent.py
                         set the experiment name (for training)
 ```
 
-### Pixel-Based A2C
+## Pixel-Based A2C
 
 To test the Pixel-Based A2C
 ```bash
 python a2cAgent.py --test
 ```
-Other Commands
+Other Commands for Training
 ```bash
-python a2cAgent.py
+python a2cAgent.py 
 
   --learning_rate LEARNING_RATE,
                         set learning rate for training the model
@@ -120,13 +120,13 @@ python a2cAgent.py
                         set the experiment name (for training)
 ```
 
-### Pixel-Based DQN
+## Pixel-Based DQN
 
 To test the Pixel-Based DQN
 ```bash
 python dqnAgent.py --test
 ```
-Other Commands
+Other Commands for Training
 ```bash
 python a2cAgent.py
 
