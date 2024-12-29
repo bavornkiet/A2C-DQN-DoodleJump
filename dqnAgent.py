@@ -316,7 +316,7 @@ if __name__ == "__main__":
     elif args.test:
         test(game, args)
     else:
-        hyper_params = "_m_"+args.model+"_lr_"+str(args.learning_rate)+"_g_"+str(args.gamma)+"_mem_"+str(args.max_memory)+"_batch_"+str(args.batch_size)+"reward_"+str(args.reward_type)+"_exp_"+str(args.explore)+"_decay_"+str(args.decay_factor)+"_eps_"+str(args.epsilon)
+        hyper_params = "_m_"+args.model+"_lr_"+str(args.learning_rate)+"_g_"+str(args.gamma)+"_mem_"+str(args.max_memory)+"_batch_"+str(args.batch_size)+"_reward_"+str(args.reward_type)+"_exp_"+str(args.explore)+"_decay_"+str(args.decay_factor)+"_eps_"+str(args.epsilon)
         arg_dict = vars(args)
 
         dstr = datetime.datetime.now().strftime("_dt-%Y-%m-%d-%H-%M-%S")
