@@ -50,7 +50,7 @@ By employing these algorithms on both pixel data and engineered features, the pr
 
 ## Usage
 
-Each agent has a dedicated training script. Use the following commands to train each agent:
+Each agent has a dedicated training/testing script. Use the following commands to train/test each agent:
 
 ## Feature-Based A2C
 
