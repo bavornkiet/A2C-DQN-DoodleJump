@@ -75,7 +75,7 @@ def parse_args():
     parser.add_argument("--server", action="store_true")
     parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--max_episodes', type=int, default=1000)
+    parser.add_argument('--max_games', type=int, default=1000)
     parser.add_argument('--experiment_name', type=str, default='exp1')
     parser.add_argument('--test', action='store_true',
                         help="If set, runs the agent in test mode")
@@ -136,7 +136,7 @@ def main():
     if not args.test:
         # --------------- TRAIN MODE ---------------
         start_time = time.time()
-        for episode in range(args.max_episodes):
+        for episode in range(args.max_games):
             state = env.getFeatures()  # Reset-like logic
             done = False
 
@@ -245,7 +245,7 @@ def main():
             f.write("===== Training Summary =====\n")
             f.write(f"Experiment Name: {args.experiment_name}\n")
             f.write(f"Total Training Time: {total_train_time:.2f} s\n")
-            f.write(f"Max Episodes: {args.max_episodes}\n")
+            f.write(f"Max Episodes: {args.max_games}\n")
             f.write(f"Learning Rate: {args.learning_rate}\n")
             f.write(f"Reward Type: {args.reward_type} \n")
             f.write(f"Gamma: {args.gamma}\n")
