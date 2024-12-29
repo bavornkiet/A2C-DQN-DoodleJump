@@ -53,36 +53,23 @@ Each agent has a dedicated training script. Use the following commands to train 
 
 ### Feature-Based A2C
 
+To test the Feature-Based 
+```bash
+python a2cAgent.py --test
+```
+Other Commands
 ```bash
 python a2cAgent.py
 
-  --human               playing the game manually without agent
-  --test                playing the game with a trained agent
-  -m {dqn,drqn,resnet,mobilenet,mnasnet}, --model {dqn,drqn,resnet,mobilenet,mnasnet}
-                        select model to train the agent
-  -p MODEL_PATH, --model_path MODEL_PATH
-                        path to weights of an earlier trained model
-  -lr LEARNING_RATE, --learning_rate LEARNING_RATE
+  --learning_rate LEARNING_RATE,
                         set learning rate for training the model
-  -gamma GAMMA, --gamma GAMMA
+  -gamma GAMMA, 
                         set discount factor for q learning
-  --reward_type {1,2,3,4,5,6}
+  --reward_type {1,2,3}
                         types of rewards formulation
-  --exploration EXPLORATION
-                        number of games to explore
-  --channels CHANNELS   set the image channels for preprocessing
-  --height HEIGHT       set the image height post resize
-  --width WIDTH         set the image width post resize
-  --server              when training on server add this flag
-  --seed SEED           change seed value for creating game randomness
+  --server              when training on server add this flag to stop the game from rendering
   --max_games MAX_GAMES
                         set the max number of games to be played by the agent
-  --explore {epsilon_g,epsilon_g_decay_exp,epsilon_g_decay_exp_cur}
-                        select the exploration vs exploitation tradeoff
-  --decay_factor DECAY_FACTOR
-                        set the decay factor for exploration
-  --epsilon EPSILON     set the epsilon value for exploration
-  --attack              use fast fgsm attack to manipulate the input state
-  --attack_eps ATTACK_EPS
-                        epsilon value for the fgsm attack
+  --experiment_name EXPERIMENT_NAME
+                        set the experiment name (for training)
 ```
