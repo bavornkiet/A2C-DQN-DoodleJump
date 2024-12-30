@@ -147,7 +147,7 @@ python dqnAgent.py
   --macos                      select model to train the agent on macOS
   --human                      play the game manually without the agent
   --test                       play the game with a trained agent
-  -m, --model {dqn,drqn,resnet,mobilenet,mnasnet}
+  -m, --model {dqn}
                                select the model to train the agent
   -p, --model_path MODEL_PATH  path to weights of an earlier trained model
   -lr, --learning_rate LEARNING_RATE

@@ -8,7 +8,7 @@ from scipy.stats import trim_mean
 import numpy as np
 from collections import deque
 from game.game import DoodleJump
-from model.deepQNetwork import DQNModel, DRQNModel
+from model.deepQNetwork import DQNModel
 from model.dqnTrainer import QLearningTrainer
 from helper import write_model_params
 from torch.utils.tensorboard import SummaryWriter
@@ -50,8 +50,6 @@ class Agent:
             
         if config.model == "dqn":
             self.network = DQNModel()
-        elif config.model == "drqn":
-            self.network = DRQNModel()
 
         self.network = self.network.to(self.device)
         
@@ -287,7 +285,7 @@ if __name__ == "__main__":
     parser.add_argument("--macos", action="store_true")
     parser.add_argument("--human", action="store_true")
     parser.add_argument("--test", action="store_true")
-    parser.add_argument("-m", "--model", type=str, default="dqn", choices=["dqn", "drqn", "resnet", "mobilenet", "mnasnet"])
+    parser.add_argument("-m", "--model", type=str, default="dqn")
     parser.add_argument("-p", "--model_path", type=str)
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.001)
     parser.add_argument("-g", "--gamma", type=float, default=0.9)
