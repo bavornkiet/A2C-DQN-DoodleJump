@@ -12,3 +12,7 @@ random
 sys
 pygame
 cv2
+torch
+deque
+collections
+
