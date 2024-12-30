@@ -1,4 +1,13 @@
-torch
-gym
-pygame
 numpy
+psutil
+GPUtil
+scipy
+tensorboard
+argparse
+json5
+time
+os
+datetime
+random
+sys
+pygame

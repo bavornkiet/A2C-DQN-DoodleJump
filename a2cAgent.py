@@ -1,5 +1,11 @@
+from model.a2cTrainer import A2CTrainer
+from model.a2cNetwork import ActorNetwork, CriticNetwork
 import torch
 import numpy as np
+import psutil
+import GPUtil
+from scipy.stats import trim_mean
+from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import random
 import os
@@ -9,475 +15,274 @@ import json
 import time
 from torch.nn import functional as F
 from torch.utils.tensorboard import SummaryWriter
-from game.game import DoodleJump  # The game environment.
-from model.a2cNetwork import ActorCritic  # The neural network model.
-from model.a2cTrainer import A2CLearner  # The A2C algorithm implementation.
-# This script contains the main logic for training and testing the agent.
+from game.game import DoodleJump
+import sys
+import os
+import numpy as np
+import torch
+# from model.a2cNetwork import ActorCritic
+# from model.a2cTrainer import A2CLearner
 
-# Mish: A smooth, non-monotonic activation function that can improve
-# neural network performance. It's defined and wrapped in an nn.Module
-# for use in the network.
-
-
-def mish(input):
-    return input * torch.tanh(F.softplus(input))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'model'))
 
 
-class Mish(nn.Module):
-    def __init__(self): super().__init__()
-    def forward(self, input): return mish(input)
+def get_available_device():
+    gpus = GPUtil.getGPUs()
+    if not gpus:
+        print("No GPU found. Using CPU.")
+        return torch.device('cpu')
 
-# t(x): Converts a NumPy array or any input x into a PyTorch tensor of type float.
+    # Find RTX3060 by name
+    for gpu in gpus:
+        if '3060' in gpu.name:
+            print(f"Using GPU: {gpu.name}")
+            return torch.device(f'cuda:{gpu.id}')
 
-
-def t(x):
-    x = np.array(x) if not isinstance(x, np.ndarray) else x
-    return torch.from_numpy(x).float()  # .reshape(6400, 1)
-
-# The Runner class is responsible for interacting with the game
-# environment, processing observations, and collecting experiences.
-
-
-class Runner():
-    def __init__(self, game, hyper_params, dstr, args):
-        self.game = game
-        self.state = None
-        self.done = True
-        self.steps = 0
-        self.episode_reward = 0
-        self.mean_reward = 0
-        self.mean_score = 0
-        self.N_PLATFORMS = 10
-        self.N_SPRINGS = 3
-        self.N_MONSTERS = 2
-        self.episode_rewards = []
-        self.total_score = 0
-        ''''''
-        self.game_counter = 0
-        self.epsilon = 0
-        self.ctr = 1
-        seed = args.seed
-        os.environ['PYTHONHASHSEED'] = str(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        np.random.seed(seed)
-        random.seed(seed)
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu")
-        self.gamma = args.gamma
-        self.batch_size = args.batch_size
-        self.hyper_params = hyper_params
-        self.dstr = dstr
-        self.record = 0
-    # Reset: Resets the game state for a new episode.
-
-    def reset(self):
-        self.episode_reward = 0
-        self.done = False
-        self.state = None
-        self.game.gameReboot()
-    # Image Processing
-#     Resize: Adjusts the image to the desired dimensions.
-# Rotate: Rotates the image by 270 degrees to match the orientation expected by the model.
-# Normalization: Applies ImageNet mean and standard deviation normalization.
-# Color Channels: Converts to grayscale if image_c == 1.
-# Reshape: Adds a batch dimension.
-
-    def convert_state_to_vector(self, state_dict):
-        # Flatten the state dictionary into a feature vector
-        state_vector = []
-
-        # Player features
-        N_PLATFORMS = 15
-        N_SPRINGS = 3
-        N_MONSTERS = 1
-        player_x = state_dict['player_x']
-        player_y = state_dict['player_y']
-        player_xmovement = state_dict['player_xmovement']
-        player_ymovement = state_dict['player_ymovement']
-        score = state_dict['score']
-
-        state_vector.extend([
-            player_x,
-            player_y,
-            player_xmovement,
-            player_ymovement,
-            score
-        ])
-
-        # Helper function to compute distance
-        def distance_to_player(obj):
-            dx = obj['x'] - player_x
-            dy = obj['y'] - player_y
-            return np.sqrt(dx ** 2 + dy ** 2)
-
-        # Select N nearest platforms
-        platforms = state_dict['platforms']
-        platforms.sort(key=lambda p: distance_to_player(p))
-        selected_platforms = platforms[:self.N_PLATFORMS]
-
-        for platform in selected_platforms:
-            state_vector.extend([
-                platform['x'],
-                platform['y'],
-                platform['type'],
-                platform['state']
-            ])
-
-        # Pad if fewer platforms
-        for _ in range(self.N_PLATFORMS - len(selected_platforms)):
-            state_vector.extend([0, 0, 0, 0])
-
-        # Springs
-        springs = state_dict['springs']
-        springs.sort(key=lambda s: distance_to_player(s))
-        selected_springs = springs[:self.N_SPRINGS]
-
-        for spring in selected_springs:
-            state_vector.extend([
-                spring['x'],
-                spring['y'],
-                spring['state']
-            ])
-
-        # Pad if fewer springs
-        for _ in range(self.N_SPRINGS - len(selected_springs)):
-            state_vector.extend([0, 0, 0])
-
-        # Monsters
-        monsters = state_dict['monsters']
-        monsters.sort(key=lambda m: distance_to_player(m))
-        selected_monsters = monsters[:self.N_MONSTERS]
-
-        for monster in selected_monsters:
-            state_vector.extend([
-                monster['x'],
-                monster['y'],
-                monster['state']
-            ])
-
-        # Pad if fewer monsters
-        for _ in range(self.N_MONSTERS - len(selected_monsters)):
-            state_vector.extend([0, 0, 0])
-
-        # Normalize features
-        state_vector = self.normalize_features(state_vector)
-
-        return np.array(state_vector, dtype=np.float32)
+    # If RTX3060 not found, use the first available GPU
+    print(f"Using GPU: {gpus[0].name}")
+    return torch.device(f'cuda:{gpus[0].id}')
 
 
-# Get Current State: Retrieves and preprocesses the current game frame.
+def log_resource_usage(writer, episode):
+    # CPU and RAM usage
+    cpu_percent = psutil.cpu_percent()
+    ram = psutil.virtual_memory()
+    ram_percent = ram.percent
 
-
-    def get_state(self):
-        state_dict = self.game.getFeatures()
-        state_vector = self.convert_state_to_vector(state_dict)
-        return state_vector
-# Main Loop:
-# Reset Check: Resets the game if the episode is done.
-# State Retrieval: Gets the current state.
-# Action Selection:
-# Policy Forward Pass: Passes the state through the actor-critic network to get action distributions.
-# Action Sampling: Samples an action from the distribution.
-# Action Clipping: Clips actions to the valid range.
-# Action Formatting: Converts the action into the game's expected format.
-# Environment Interaction: Takes a step in the game using playStep.
-# Memory Storage: Stores experiences for training.
-# Reward and Score Tracking: Updates rewards and scores.
-# Model Saving: Saves the model periodically and when a new record is achieved.
-# Logging: Writes metrics to TensorBoard and prints progress.
-
-    def normalize_features(self, features):
-        # Example normalization (you may need to adjust based on your game's specifics)
-        features[0] /= 800  # player_x
-        features[1] /= 800  # player_y
-        features[2] /= 10  # player_xmovement
-        features[3] /= 35  # player_ymovement
-        features[4] /= 30000  # score
-
-        # Normalize platform positions and types
-        # index = 5
-        # # 4 features per platform * max_platforms
-        # num_platform_features = 4 * self.N_PLATFORMS
-        # for i in range(index, index + num_platform_features, 4):
-        #     features[i] /= self.game.screen_width  # platform_x
-        #     features[i + 1] /= self.game.screen_height  # platform_y
-
-        # for i in range(num_Platforms):
-        #     # platform_x
-        #     features['platforms'][i]['x'] /= self.game.screen_width
-        #     # platform_y
-        #     features['platforms'][i]['y'] /= self.game.screen_height
-        #     # Type and state may not need normalization if they are categorical/integers
-
-        # for i in range(num_Springs):
-        #     features['springs'][i]['x'] /= self.game.screen_width
-        #     features['springs'][i]['y'] /= self.game.screen_height
-        #     # Type and state may not need normalization if they are categorical/integers
-
-        # for i in range(num_monsters):
-        #     features['monsters'][i]['x'] /= self.game.screen_width  # platform_x
-        #     # platform_y
-        #     features['monsters'][i]['y'] /= self.game.screen_height
-        #     # Type and state may not need normalization if they are categorical/integers
-        index = 5  # Starting index for platforms
-
-    # Platforms normalization
-        num_platform_features = 4 * self.N_PLATFORMS
-        for i in range(self.N_PLATFORMS):
-            # platform_x
-            features[index] /= self.game.screen_width
-            index += 1
-            # platform_y
-            features[index] /= self.game.screen_height
-            index += 3
-            # type (categorical, can be left as is)
-            # index += 2
-            # state (categorical, can be left as is)
-            # index += 1
-
-        # Springs normalization
-        num_spring_features = 3 * self.N_SPRINGS
-        for i in range(self.N_SPRINGS):
-            # spring_x
-            features[index] /= self.game.screen_width
-            index += 1
-            # spring_y
-            features[index] /= self.game.screen_height
-            index += 2
-            # state (categorical)
-            # index += 1
-
-        # Monsters normalization
-        num_monster_features = 3 * self.N_MONSTERS
-        for i in range(self.N_MONSTERS):
-            # monster_x
-            features[index] /= self.game.screen_width
-            index += 1
-            # monster_y
-            features[index] /= self.game.screen_height
-            index += 2
-            # state (categorical)
-            # index += 1
-        return features
-
-    def run(self, max_steps, memory=None):
-        if not memory or len(memory) > args.max_memory:
-            memory = []
-        for _ in range(max_steps):
-            if self.done:
-                self.reset()
-            state_old = self.get_state()
-            state_tensor = t(state_old).unsqueeze(0).to(self.device)
-            dists = actorcritic(state_tensor)[0]
-            actions = dists.sample().detach().cpu().numpy()[0]
-            actions_clipped = np.clip(actions, -1, 1)
-
-            # Prepare action for the game
-            final_move = [0, 0, 0]
-            final_move[np.argmax(actions_clipped)] = 1
-            reward, self.done, score = self.game.playStep(final_move)
-
-            next_state = self.get_state()
-            memory.append(
-                (actions, reward, state_old, next_state, self.done))
-
-            self.state = next_state
-            self.steps += 1
-            self.episode_reward += reward
-            self.mean_reward = self.episode_reward / self.steps
-
-            writer.add_scalar("Reward/mean_reward",
-                              self.mean_reward, global_step=self.steps)
-
-            if self.done:
-                self.game_counter += 1
-                self.episode_rewards.append(self.episode_reward)
-                if len(self.episode_rewards) % 10 == 0:
-                    print("Episode:", len(self.episode_rewards),
-                          ", Episode Reward:", self.episode_reward)
-                writer.add_scalar("Reward/episode_reward",
-                                  self.episode_reward, global_step=self.steps)
-
-                # Inside the run method of Runner class
-                if score > self.record:
-                    self.record = score
-                    # Save the best model with hyperparameters and dstr
-                    model_filename = (
-                        f"a2c_model_best" +
-                        f"{self.hyper_params}" +
-                        f"{self.dstr}.pth"
-                    )
-                    actorcritic.save(file_name=model_filename,
-                                     model_folder_path="./Parameters")
-
-                if self.game_counter % 100 == 0:
-                    # Save the model periodically
-                    model_filename = (
-                        f"a2c_model_{self.game_counter}" +
-                        f"{self.hyper_params}" +
-                        f"{self.dstr}.pth"
-                    )
-                    actorcritic.save(file_name=model_filename,
-                                     model_folder_path="./Parameters")
-
-                print('Game', self.game_counter, 'Score',
-                      score, 'Record:', self.record)
-                writer.add_scalar('Score/High_Score',
-                                  self.record, self.game_counter)
-
-                self.total_score += score
-                self.mean_score = self.total_score / agent.game_counter
-                writer.add_scalar('Score/Mean_Score',
-                                  self.mean_score, self.game_counter)
-        return memory
-
-
-# Testing Loop:
-# State Retrieval: Gets the current state.
-# Action Selection: Similar to the training loop but without storing experiences.
-# Game Interaction: Takes a step in the game.
-# Score Tracking: Keeps track of scores and records.
-
-
-def test(game, args):
-    record = 0
-    agent = Runner(game)
-    print("Now testing")
-
-    while agent.game_counter != args.max_games:
-        state_old = agent.get_state()
-        state_tensor = t(state_old).unsqueeze(0).to(agent.device)
-        dists = actorcritic(state_tensor)[0]
-        actions = dists.sample().detach().cpu().numpy()[0]
-        actions_clipped = np.clip(actions, -1, 1)
-
-        final_move = [0, 0, 0]
-        final_move[np.argmax(actions_clipped)] = 1
-        reward, done, score = game.playStep(final_move)
-        if done:
-            agent.game_counter += 1
-            game.gameReboot()
-            if score > record:
-                record = score
-            print('Game', agent.game_counter, 'Score', score, 'Record:', record)
-# Argument Parsing: Parses command-line arguments for configuration.
-# Game and Agent Initialization: Sets up the game and agent.
-# Logging Setup: Configures TensorBoard logging.
-# Model Initialization: Creates the actor-critic network.
-# Model Loading: Loads a pre-trained model if specified.
-# Testing or Training: Decides whether to run in test mode or train the agent.
-# Training Loop:
-# Experience Collection: Runs the agent to collect experiences.
-# Learning Step: Updates the model using the collected experiences.
-# Logging: Records hyperparameters and final metrics.
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='RL Agent for Doodle Jump')
-    parser.add_argument("--macos", action="store_true",
-                        help="select model to train the agent")
-    parser.add_argument("--human", action="store_true",
-                        help="playing the game manually without agent")
-    parser.add_argument("--test", action="store_true",
-                        help="playing the game with a trained agent")
-    parser.add_argument("-d", "--difficulty", type=str, default="EASY",
-                        choices=["EASY", "MEDIUM", "HARD"], help="select difficulty of the game")
-    parser.add_argument("-m", "--model", type=str, default="a2c",
-                        choices=["a2c"], help="select model to train the agent")
-    parser.add_argument("-p", "--model_path", type=str,
-                        help="path to weights of an earlier trained model")
-    # parser.add_argument("-cp", "--critic_path", type=str, help="path to weights of an earlier trained model")
-    parser.add_argument("-alr", "--actor_lr", type=float, default=1e-4,
-                        help="set learning rate for training the model")
-    parser.add_argument("-clr", "--critic_lr", type=float, default=1e-3,
-                        help="set learning rate for training the model")
-    parser.add_argument("-g", "--gamma", type=float, default=0.99,
-                        help="set discount factor for q learning")
-    parser.add_argument("--max_memory", type=int, default=10000,
-                        help="Buffer memory size for long training")
-    parser.add_argument("--store_frames", action="store_true",
-                        help="store frames encountered during game play by agent")
-    parser.add_argument("--batch_size", type=int, default=1000,
-                        help="Batch size for long training")
-    parser.add_argument("--reward_type", type=int, default=5,
-                        choices=[1, 2, 3, 4, 5, 6], help="types of rewards formulation")
-    parser.add_argument("--exploration", type=int, default=40,
-                        help="number of games to explore")
-    parser.add_argument("--channels", type=int, default=1,
-                        help="set the image channels for preprocessing")
-    parser.add_argument("--height", type=int, default=80,
-                        help="set the image height post resize")
-    parser.add_argument("--width", type=int, default=80,
-                        help="set the image width post resize")
-    parser.add_argument("--server", action="store_true",
-                        help="when training on server add this flag")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="change seed value for creating game randomness")
-    parser.add_argument("--max_games", type=int, default=2000,
-                        help="set the max number of games to be played by the agent")
-    args = parser.parse_args()
-
-    game = DoodleJump(difficulty=args.difficulty,
-                      server=args.server, reward_type=args.reward_type)
-
-    hyper_params = "_d_" + args.difficulty + "_m_" + args.model + "_alr_" + str(args.actor_lr) + "_clr_" + str(
-        args.critic_lr) + "_g_" + str(args.gamma) + "_mem_" + str(args.max_memory) + "_batch_" + str(args.batch_size)
-    dstr = datetime.datetime.now().strftime("_dt-%Y-%m-%d-%H-%M-%S")
-
-    # Save hyperparameters and dstr to JSON file
-    hyperparameters = vars(args)
-    hyperparameters['dstr'] = dstr
-    os.makedirs('./Parameters', exist_ok=True)
-    # with open(f'./Parameters/hyperparameters_{dstr}.json', 'w') as f:
-    #     json.dump(hyperparameters, f, indent=4)
-
-    # Update the log directory to include hyperparameters and dstr
-    writer = SummaryWriter(log_dir=os.path.join(
-        "./Parameters", "logs", hyper_params + dstr))
-    arg_dict = vars(args)
-    writer.add_text('Model Parameters', str(arg_dict), 0)
-    writer.add_text('Datetime String', dstr, 0)
-    agent = Runner(game, hyper_params, dstr, args)
-    print(f"Using device: {agent.device}")
-    # Configuration
-    state_example = agent.get_state()
-    state_dim = len(state_example)
-    n_actions = 3  # Number of possible actions
-
-    actorcritic = ActorCritic(state_dim, n_actions,
-                              activation=nn.Tanh).to(agent.device)
-    if args.model_path or args.test:
-        actorcritic.load_state_dict(torch.load(args.model_path))
-
-    if args.test:
-        test(game, args)
+    # GPU usage
+    gpus = GPUtil.getGPUs()
+    if gpus:
+        gpu = gpus[0]  # Assuming RTX3060 is first
+        gpu_load = gpu.load * 100  # Convert to percentage
+        gpu_memory_used = gpu.memoryUsed  # In MB
+        gpu_memory_total = gpu.memoryTotal  # In MB
     else:
-        learner = A2CLearner(actorcritic, agent.device, gamma=args.gamma, entropy_beta=0.01,
-                             actor_lr=args.actor_lr, critic_lr=args.critic_lr, max_grad_norm=0.5,
-                             batch_size=args.batch_size)
+        gpu_load = 0
+        gpu_memory_used = 0
+        gpu_memory_total = 0
 
-        steps_on_memory = 16
+    # Log to TensorBoard
+    writer.add_scalar('Resource/CPU_Usage', cpu_percent, episode)
+    writer.add_scalar('Resource/RAM_Usage', ram_percent, episode)
+    writer.add_scalar('Resource/GPU_Usage', gpu_load, episode)
+    writer.add_scalar('Resource/GPU_Memory_Used', gpu_memory_used, episode)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="A2C Agent for DoodleJump")
+    parser.add_argument("--reward_type", type=int,
+                        default=2, choices=[1, 2, 3])
+    parser.add_argument("--server", action="store_true")
+    parser.add_argument('--learning_rate', type=float, default=0.001)
+    parser.add_argument('--gamma', type=float, default=0.99)
+    parser.add_argument('--max_games', type=int, default=1000)
+    parser.add_argument('--experiment_name', type=str, default='exp1')
+    parser.add_argument('--test', action='store_true',
+                        help="If set, runs the agent in test mode")
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    device = get_available_device()
+    # Create folder structure for saving parameters
+    parameters_folder = os.path.join(
+        "Parameters", "gamma_testing", args.experiment_name)
+    if not os.path.exists(parameters_folder):
+        os.makedirs(parameters_folder)
+
+    # Initialize TensorBoard SummaryWriter
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    tensorboard_log_dir = os.path.join(
+        "runs", "gamma_testing", f"{args.experiment_name}")
+    writer = SummaryWriter(log_dir=tensorboard_log_dir)
+
+    # Initialize Environment
+    env = DoodleJump(
+        server=args.server,
+        reward_type=args.reward_type,
+        FPS=1000,
+        render_skip=0
+        # add other env configs as needed
+    )
+
+    # We need to figure out the dimension of your state and action
+    # By default, from your environment code, you get: getFeatures returns a 1D array
+    sample_state = env.getFeatures()
+    state_dim = sample_state.shape[0]
+
+    # For discrete actions: let's assume you have 3 actions: [Left, Idle, Right].
+    # Adjust accordingly if your environment has a different action space.
+    action_dim = 3
+
+    # Initialize Actor-Critic networks
+    actor = ActorNetwork(state_dim, action_dim, hidden_size=128).to(device)
+    critic = CriticNetwork(state_dim, hidden_size=128).to(device)
+
+    # Initialize A2C trainer
+    trainer = A2CTrainer(
+        actor=actor,
+        critic=critic,
+        lr=args.learning_rate,
+        gamma=args.gamma,
+        beta_entropy=0.001,  # optional
+        device=device
+    )
+    total_train_time = 0.0
+    best_score = float("-inf")
+    all_scores = []
+    all_rewards = []
+
+    if not args.test:
+        # --------------- TRAIN MODE ---------------
         start_time = time.time()
-        while agent.game_counter != args.max_games:
-            memory = agent.run(steps_on_memory)
-            learner.learn(memory, agent.steps, writer, discount_rewards=False)
-        end_time = time.time()
-        total_time = end_time - start_time
-        print(f"Training completed in {total_time:.2f} seconds.")
+        for episode in range(args.max_games):
+            state = env.getFeatures()  # Reset-like logic
+            done = False
 
-        writer.add_hparams(hparam_dict=vars(args),
-                           metric_dict={'mean_reward': agent.mean_reward,
-                                        'high_score': agent.record,
-                                        'mean_score': agent.mean_score,
-                                        'total_time_sec': total_time})
+            episode_rewards = []
+            episode_states = []
+            episode_actions = []
+            episode_log_probs = []
+            episode_values = []
+            episode_dones = []
 
-        # Optionally, Print Total Time in Hours, Minutes, Seconds
-        hours, rem = divmod(total_time, 3600)
-        minutes, seconds = divmod(rem, 60)
-        # print(hours+":"+)
-        # print(minutes)
+            while not done:
+                # 1) Convert state to torch tensor
+                state_t = torch.FloatTensor(state).unsqueeze(
+                    0).to(device)  # shape [1, state_dim]
 
-    # Close the SummaryWriter
-    writer.close()
+                # 2) Actor forward pass -> raw logits
+                logits = actor(state_t)
+                dist = torch.distributions.Categorical(logits=logits)
+                action = dist.sample()  # sample an action
+                log_prob = dist.log_prob(action)
+
+                # 3) Critic forward pass -> value
+                value = critic(state_t)  # shape []
+
+                # 4) Step the environment
+                action_index = action.item()
+
+                action_list = [0, 0, 0]
+                action_list[action_index] = 1
+
+                reward, done, score = env.agentPlay(action_list)
+                # env.agentPlay returns reward, terminal, score
+
+                # 5) Collect transitions
+                episode_states.append(state)
+                episode_actions.append(action_index)
+                episode_values.append(value)
+                episode_log_probs.append(log_prob)
+                episode_rewards.append(reward)
+                episode_dones.append(done)
+
+                # 6) Next state
+                next_state = env.getFeatures()
+                state = next_state
+
+            # ============ End of Episode ==============
+            if not env.is_terminal_state():
+                # If not terminal, get critic value for next_state
+                next_state_t = torch.FloatTensor(state).unsqueeze(0).to(device)
+                last_value = critic(next_state_t)
+            else:
+                last_value = 0.0
+
+            # 7) Compute returns
+            returns = trainer.compute_returns(
+                episode_rewards, episode_dones, last_value)
+
+            # 8) Update the networks
+            actor_loss, critic_loss = trainer.update(
+                states=episode_states,
+                actions=episode_actions,
+                returns=returns,
+                values=episode_values,
+                log_probs=episode_log_probs
+            )
+
+            # Some logging
+            ep_score = score
+            all_scores.append(ep_score)
+            ep_reward = sum(episode_rewards)
+            all_rewards.append(ep_reward)
+            best_score = max(best_score, ep_score)
+
+            log_resource_usage(writer, episode)
+            mean_score = np.mean(all_scores)
+
+            mean_reward = np.mean(all_rewards)
+            writer.add_scalar(
+                'Training/Mean_Score', mean_score, episode)
+            writer.add_scalar(
+                'Training/Mean_Reward', mean_reward, episode)
+            writer.add_scalar(
+                'Training/High_Score', best_score, episode)
+
+            if (episode + 1) % 10 == 0:
+                print(f"Episode: {episode+1}, Score: {ep_score}, Reward: {ep_reward}, "
+
+                      f"Actor Loss: {actor_loss:.3f}, Critic Loss: {critic_loss:.3f}")
+
+        total_train_time = time.time() - start_time
+        trimmed_avg = trim_mean(all_scores, 0.1)
+
+        # ============ Save final model =============
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        actor_save_path = os.path.join(
+            parameters_folder, f"model_actor_{timestamp}.pth")
+        critic_save_path = os.path.join(
+            parameters_folder, f"model_critic_{timestamp}.pth")
+
+        torch.save(actor.state_dict(), actor_save_path)
+        torch.save(critic.state_dict(), critic_save_path)
+
+        # ============ Save summary =============
+        summary_file = os.path.join(parameters_folder, "training_summary.txt")
+        with open(summary_file, "w") as f:
+            f.write("===== Training Summary =====\n")
+            f.write(f"Experiment Name: {args.experiment_name}\n")
+            f.write(f"Total Training Time: {total_train_time:.2f} s\n")
+            f.write(f"Max Episodes: {args.max_games}\n")
+            f.write(f"Learning Rate: {args.learning_rate}\n")
+            f.write(f"Reward Type: {args.reward_type} \n")
+            f.write(f"Gamma: {args.gamma}\n")
+            f.write(f"Best Score Achieved: {best_score}\n")
+            f.write(f"Mean Score: {np.mean(all_scores):.2f}\n")
+            f.write(f"Trimmed Mean Score: {trimmed_avg:.2f}\n")
+            f.write(f"Mean Reward: {np.mean(all_rewards):.2f}\n")
+            f.write(f"Number of Episodes: {len(all_scores)}\n")
+            f.write("===========================\n")
+
+        print("Training complete. Models and summary saved in:", parameters_folder)
+
+    else:
+        print("Running in test mode. Evaluate agent's performance...")
+        actor_load_path = "Parameters/reward_testing/expR3-2/model_actor_20241228-210124.pth"
+        critic_load_path = "Parameters/reward_testing/expR3-2/model_critic_20241228-210124.pth"
+        actor.load_state_dict(torch.load(actor_load_path, map_location=device))
+        critic.load_state_dict(torch.load(
+            critic_load_path, map_location=device))
+        actor.eval()
+        critic.eval()
+        for _ in range(10):
+            state = env.getFeatures()
+            done = False
+            while not done:
+                state_t = torch.FloatTensor(state).unsqueeze(0).to(device)
+                logits = actor(state_t)
+                dist = torch.distributions.Categorical(logits=logits)
+                action = dist.sample().item()
+
+                action_list = [0, 0, 0]
+                action_list[action] = 1
+
+                reward, done, score = env.agentPlay(action_list)
+                state = env.getFeatures()
+            print("Finished test episode with score:", score)
+
+
+if __name__ == "__main__":
+    main()

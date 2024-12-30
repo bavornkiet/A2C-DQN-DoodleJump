@@ -371,7 +371,7 @@ class DoodleJump:
             pygame.draw.line(self.screen, (222, 222, 222),
                              (0, x * 12), (800, x * 12))
 
-    def getFeatures(self, max_platforms=10, max_monsters=3):
+    def getFeatures(self, max_platforms=5, max_monsters=1):
         """
         Returns a single 1D NumPy array encoding:
         1) Agent's normalized state
@@ -506,7 +506,6 @@ class DoodleJump:
             monsters_data.append((dist, mx, my, m_state))
 
         # Sort and pick closest 3
-        max_monsters = 3
         monsters_data.sort(key=lambda x: x[0])
         nearest_monsters = monsters_data[:max_monsters]
 
@@ -638,7 +637,7 @@ class DoodleJump:
         # x = 0
         while True:
             self.screen.fill((255, 255, 255))
-            clock.tick(60)
+            clock.tick(120)
 
             for event in pygame.event.get():
                 if event.type == QUIT:

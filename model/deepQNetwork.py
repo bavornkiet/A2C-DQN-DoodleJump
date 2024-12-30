@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.models as models
 import os
-from torch.distributions.categorical import Categorical
-
 
 class Deep_QNet(nn.Module):
     def __init__(self):

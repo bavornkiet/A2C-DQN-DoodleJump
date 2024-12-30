@@ -1,61 +1,48 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import os
 
 
-class ActorCritic(nn.Module):
-    def __init__(self, state_dim, n_actions, activation=nn.Tanh):
-        super().__init__()
-        self.n_actions = n_actions
+class ActorNetwork(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_size=128):
+        super(ActorNetwork, self).__init__()
+        """
+        A separate Actor network for policy.
+        :param state_dim: number of input features from the environment
+        :param action_dim: number of discrete actions
+        :param hidden_size: size of hidden layers
+        """
+        self.fc1 = nn.Linear(state_dim, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.logits = nn.Linear(hidden_size, action_dim)
 
-        # Common network
-        self.fc_common = nn.Sequential(
-            nn.Linear(state_dim, 128),
-            activation(),
-            nn.Linear(128, 128),
-            activation(),
-        )
+    def forward(self, x):
+        """
+        Forward pass to get the raw action logits.
+        """
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        out = self.logits(x)  # raw scores for each action
+        return out
 
-        # Actor network
-        self.fc_actor = nn.Sequential(
-            nn.Linear(128, 64),
-            activation(),
-            nn.Linear(64, n_actions),
-        )
 
-        # Critic network
-        self.fc_critic = nn.Sequential(
-            nn.Linear(128, 64),
-            activation(),
-            nn.Linear(64, 1),
-        )
+class CriticNetwork(nn.Module):
+    def __init__(self, state_dim, hidden_size=128):
+        super(CriticNetwork, self).__init__()
+        """
+        A separate Critic network for state-value estimation.
+        :param state_dim: number of input features from the environment
+        :param hidden_size: size of hidden layers
+        """
+        self.fc1 = nn.Linear(state_dim, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.value_head = nn.Linear(hidden_size, 1)
 
-        # Log standard deviations for action distribution
-        logstds_param = nn.Parameter(torch.full((n_actions,), 0.1))
-        self.register_parameter("logstds", logstds_param)
-
-    def forward(self, X):
-        x = X
-        common_res = self.fc_common(x)
-        # Actor output
-        means = self.fc_actor(common_res)
-        stds = torch.clamp(self.logstds.exp(), 1e-3, 50)
-        # Critic output
-        value = self.fc_critic(common_res)
-        # Return action distribution and value estimate
-        return torch.distributions.Normal(means, stds), value
-
-    def save(self, file_name='model.pth', model_folder_path=None):
-        if model_folder_path is None:
-            # Default to saving in the 'Parameters' folder in the root directory
-            model_folder_path = os.path.join(
-                os.path.dirname(__file__), '..', 'Parameters')
-        else:
-            # Use the provided path, adjusted relative to the root directory
-            model_folder_path = os.path.join(
-                os.path.dirname(__file__), '..', model_folder_path)
-
-        os.makedirs(model_folder_path, exist_ok=True)
-        file_name = os.path.join(model_folder_path, file_name)
-        torch.save(self.state_dict(), file_name)
+    def forward(self, x):
+        """
+        Forward pass to get the state value.
+        """
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        value = self.value_head(x)
+        return value

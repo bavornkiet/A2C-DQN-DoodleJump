@@ -1,0 +1,13 @@
+===== Training Summary =====
+Experiment Name: expR3-2
+Total Training Time: 9928.77 s
+Max Episodes: 500
+Learning Rate: 0.001
+Reward Type: 3 
+Gamma: 0.99
+Best Score Achieved: 37300
+Mean Score: 11564.20
+Trimmed Mean Score: 10464.25
+Mean Reward: 1364.43
+Number of Episodes: 500
+===========================
