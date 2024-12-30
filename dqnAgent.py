@@ -198,9 +198,7 @@ def train(game, args, writer):
                 # Save the best model yet
                 agent.network.save(file_name="model_best.pth", folder_path="./model")
             
-            if agent.game_counter % 100 == 0:
-                # Save model every 100 games
-                agent.network.save(file_name=f"model_{agent.game_counter}.pth", folder_path="./model")
+            agent.network.save(file_name=f"model_{agent.game_counter}.pth", folder_path="./model")
 
             score_array.append(score)
             total_score += score
