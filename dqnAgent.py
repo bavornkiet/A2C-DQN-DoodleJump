@@ -8,8 +8,8 @@ from scipy.stats import trim_mean
 import numpy as np
 from collections import deque
 from game.game import DoodleJump
-from model.deepQNetwork import Deep_QNet, Deep_RQNet
-from model.dqnTrainer import QTrainer
+from model.deepQNetwork import DQNModel, DRQNModel
+from model.dqnTrainer import QLearningTrainer
 from helper import write_model_params
 from torch.utils.tensorboard import SummaryWriter
 import time
@@ -49,17 +49,17 @@ class Agent:
             self.epsilon_value = 1
             
         if config.model == "dqn":
-            self.network = Deep_QNet()
+            self.network = DQNModel()
         elif config.model == "drqn":
-            self.network = Deep_RQNet()
+            self.network = DRQNModel()
 
         self.network = self.network.to(self.device)
         
         if config.model_path or config.test:
             self.network.load_state_dict(torch.load(config.model_path, map_location=self.device), strict=False)
             
-        self.trainer = QTrainer(model=self.network, lr=self.learning_rate, gamma=self.discount_factor, device=self.device, 
-                                num_channels=self.img_channels, attack_eps=config.attack_eps)
+        self.trainer = QLearningTrainer(model=self.network, learning_rate=self.learning_rate, discount_rate=self.discount_factor, device=self.device, 
+                                channel_count=self.img_channels, epsilon=config.attack_eps)
         
     def process_frame(self, frame):
         resized_frame = cv2.resize(frame, (self.img_width, self.img_height))
@@ -112,11 +112,11 @@ class Agent:
         
         states, actions, rewards, next_states, game_done_flags = zip(*mini_batch)
         self.network.train()
-        return self.trainer.train_step(states, actions, rewards, next_states, game_done_flags)
+        return self.trainer.perform_training_step(states, actions, rewards, next_states, game_done_flags)
 
     def train_single_step(self, state, action, reward, next_state, game_done):
         self.network.train()
-        return self.trainer.train_step(state, action, reward, next_state, game_done)
+        return self.trainer.perform_training_step(state, action, reward, next_state, game_done)
     
     def choose_action(self, state, testing_mode=False):
         action_vector = [0, 0, 0]  
@@ -198,11 +198,11 @@ def train(game, args, writer):
             if score > record:
                 record = score
                 # Save the best model yet
-                agent.network.save(file_name="model_best.pth", model_folder_path="./model")
+                agent.network.save(file_name="model_best.pth", folder_path="./model")
             
             if agent.game_counter % 100 == 0:
                 # Save model every 100 games
-                agent.network.save(file_name=f"model_{agent.game_counter}.pth", model_folder_path="./model")
+                agent.network.save(file_name=f"model_{agent.game_counter}.pth", folder_path="./model")
 
             score_array.append(score)
             total_score += score
