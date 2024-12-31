@@ -242,9 +242,6 @@ def test(game, args):
     total_reward = 0
     agent = Agent(args)
     print("Now playing")
-
-    with open("test_logs.txt", "w") as f:
-        f.write("Now playing\n")
     
     while agent.game_counter < args.max_games:
         if args.attack:
@@ -269,11 +266,6 @@ def test(game, args):
 
             mean_score = cum_score / agent.game_counter
             mean_reward = total_reward / agent.game_counter
-            with open("test_logs.txt", "a") as f:
-                f.write(
-                    f"Game: {agent.game_counter} | Score: {score} | Record: {record} "
-                    f"| Mean Score: {mean_score:.2f} | Mean Reward: {mean_reward:.2f}\n"
-                )
             print(
                 f"Game {agent.game_counter} | Score: {score} | High Score: {record} "
                 f"| Mean Score: {mean_score:.2f} | Mean Reward: {mean_reward:.2f}"
