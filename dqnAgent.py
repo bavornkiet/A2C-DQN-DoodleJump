@@ -192,13 +192,16 @@ def train(game, args, writer):
             # Log metrics for the episode
             writer.add_scalar('Loss/Long_train', long_loss, agent.game_counter)
             writer.add_scalar('Training/High_Score', record, agent.game_counter)
+            writer.add_scalar('Training/Score_vs_Game', score, agent.game_counter) 
 
             if score > record:
                 record = score
                 # Save the best model yet
-                agent.network.save(file_name="model_best.pth", folder_path="./model")
-            
-            agent.network.save(file_name=f"model_{agent.game_counter}.pth", folder_path="./model")
+                agent.network.save(file_name="model_best.pth", folder_path="./pixel_based_dqn_models")
+
+            if agent.game_counter % 100 == 0:
+                # Save the model every 100 games
+                agent.network.save(file_name=f"model_{agent.game_counter}.pth", folder_path="./pixel_based_dqn_models")
 
             score_array.append(score)
             total_score += score
@@ -247,11 +250,11 @@ def test(game, args):
         if args.attack:
             state = agent.get_game_state(game)  # Original state
             adv_manip = agent.trainer.create_adv_state(state)  # Manipulated state
-            final_move = agent.choose_action(state + adv_manip, test_mode=True)
+            final_move = agent.choose_action(state + adv_manip, True)
             reward, done, score = game.agentPlay(final_move)
         else:
             state_old = agent.get_game_state(game)
-            final_move = agent.choose_action(state_old, test_mode=True)
+            final_move = agent.choose_action(state_old, True)
             reward, done, score = game.agentPlay(final_move)
 
         total_reward += reward
