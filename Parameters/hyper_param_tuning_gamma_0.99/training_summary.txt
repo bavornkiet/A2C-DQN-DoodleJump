@@ -1,0 +1,14 @@
+===== Training Summary =====
+Experiment Name: hyper_param_tuning_gamma_0.99
+Total Training Time: 25311.53 s
+Max Games: 500
+Actor LR: 0.001
+Critic LR: 0.001
+Reward Type: 2
+Gamma: 0.99
+Best Score Achieved: 12700
+Mean Score: 1314.20
+Trimmed Mean Score: 1000.50
+Mean Reward: 0.00
+Number of Games Played: 500
+===========================
