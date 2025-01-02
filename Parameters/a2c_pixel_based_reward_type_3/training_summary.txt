@@ -1,0 +1,13 @@
+===== Training Summary =====
+Experiment Name: a2c_pixel_based_reward_type_3
+Total Training Time: 16279.07 s
+Max Games: 500
+Learning Rate: 0.0004
+Reward Type: 3
+Gamma: 0.99
+Best Score Achieved: 8100
+Mean Score: 1218.20
+Trimmed Mean Score: 919.50
+Mean Reward: 0.00
+Number of Games Played: 500
+===========================

@@ -187,13 +187,13 @@ class DoodleJump:
             player = pygame.Rect(self.playerx, self.playery, self.playerRight.get_width(
             ) - 10, self.playerRight.get_height())
 
-            if rect.colliderect(player) and self.gravity and self.playery < (p[1] - self.cameray):
+            if rect.colliderect(player) and player.bottom < rect.bottom and self.gravity and self.playery < (p[1] - self.cameray):
                 if p[2] != 2:
-                    self.jump = 15
+                    self.jump = 20
                     self.gravity = 0
                 else:
                     if p[-1] != 1:
-                        self.jump = 15  # jump even when you hit red broken platform
+                        self.jump = 20 # jump even when you hit red broken platform
                         p[-1] = 1
                     else:
                         self.jump = 0
@@ -655,5 +655,6 @@ class DoodleJump:
 
 
 if __name__ == "__main__":
+    path = ""
     game = DoodleJump()
     game.run()

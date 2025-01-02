@@ -1,0 +1,13 @@
+===== Training Summary =====
+Experiment Name: dqnfeatures_gamma095
+Total Training Time: 5931.90 s
+Max Episodes: 2000
+Learning Rate: 0.001
+Reward Type: 2 
+Gamma: 0.95
+Best Score Achieved: 17800
+Mean Score: 690.85
+Trimmed Mean Score: 379.81
+Mean Reward: 66.67
+Number of Episodes: 2000
+===========================
