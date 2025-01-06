@@ -15,7 +15,6 @@ By employing these algorithms on both pixel data and engineered features, the pr
 
 - **Python**: Version 3.10+ is recommended.
 - **Package Manager**: Miniconda or pip must be installed on your machine.
-- **PyTorch**: Install the version compatible with your CUDA setup. Find the appropriate installation command [here](https://pytorch.org/get-started/previous-versions/).
 
 ### Installation
 
@@ -49,7 +48,22 @@ By employing these algorithms on both pixel data and engineered features, the pr
    ```bash
    pip install -r requirements.txt
    ```
+4. **Install numpy**
 
+   ```bash
+   pip install "numpy<2"
+   ```
+
+5. **Install Pytorch and CUDA**
+
+   - **PyTorch**: Install the version compatible with your CUDA setup. Find the appropriate installation command [here](https://pytorch.org/get-started/previous-versions/).
+   - We recommend pytorch version 2.1.0, torchvision 0.16.0 and torchaudio 2.1.0
+   - For CUDA, you would need to find a version that match with your Nvidia GPU card.
+
+```bash
+#example command
+conda install pytorch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 pytorch-cuda=12.1 -c pytorch -c nvidia
+```
 ## Usage
 
 Each agent has a dedicated training/testing script. Use the following commands to train/test each agent:
