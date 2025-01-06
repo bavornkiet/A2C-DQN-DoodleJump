@@ -157,20 +157,15 @@ python dqnPixel.py
   --max_memory MAX_MEMORY      buffer memory size for long training
   --store_frames               store frames encountered during gameplay
   --batch_size BATCH_SIZE      batch size for training
-  --reward_type {1,2,3,4,5,6}  types of rewards formulation
+  --reward_type {1,2,3}  types of rewards formulation
   --exploration EXPLORATION    number of games for exploration
-  --channels CHANNELS          set the image channels for preprocessing
-  --height HEIGHT              set the image height post-resizing
-  --width WIDTH                set the image width post-resizing
   --server                     when training on a server, add this flag to stop the game from rendering
-  --seed SEED                  random seed for reproducibility
   --max_games MAX_GAMES        set the max number of games to be played by the agent
   --explore {epsilon_g,epsilon_g_decay_exp,epsilon_g_decay_exp_cur}
                                select the exploration vs. exploitation tradeoff
   --decay_factor DECAY_FACTOR  set the decay factor for exploration
   --epsilon EPSILON            set the epsilon value for exploration
-  --attack                     enable adversarial training with FGSM attacks
-  --attack_eps ATTACK_EPS      epsilon value for FGSM adversarial attacks
+
 ```
 
 ## References
