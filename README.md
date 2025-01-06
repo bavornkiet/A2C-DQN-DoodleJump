@@ -23,8 +23,9 @@ By employing these algorithms on both pixel data and engineered features, the pr
 
    ```bash
    mkdir doodle-jump-rl
-   git clone https://github.com/yourusername/ReinforcementGRP86.git
    cd doodle-jump-rl
+   git clone https://github.com/yourusername/ReinforcementGRP86.git
+   cd ReinforcementGRP86
    ```
 
 2. **Set Up the Environment**
