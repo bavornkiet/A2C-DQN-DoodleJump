@@ -1,7 +1,7 @@
 # Doodle Jump Reinforcement Learning Agents
 ## Disclaimer
 
-This project utilizes the **Doodle Jump** environment developed by Katti et al. (2021) with modifications to the platform generation mechanism to enhance platform spawning. Additionally, a `getFeature` function was implemented to enable feature-based models to extract the state from the environment. For both the DQN and A2C pixel-based agents, we drew inspiration from their image preprocessing techniques and algorithms. However, the codebase for `a2cFeature.py`, `a2cPixel.py`, and `dqnFeature.py` was fully developed by our team from scratch, with no code borrowed from external sources.
+This project utilizes the **Doodle Jump** environment developed by Katti et al. (2021) with modifications to the platform generation mechanism to enhance platform spawning. Additionally, a `getFeature` function was implemented to enable feature-based models to extract the state from the environment. For both the DQN pixel-based agent, we drew inspiration from their image preprocessing techniques and algorithms. For A2C pixel-based-agent  `a2cPixel.py` , we also drew inspiration from their image preprocessing techniques, but other parts of the codebase are developed by our team. The codebase for `a2cFeature.py` and `dqnFeature.py` was fully developed by our team from scratch, with no code borrowed from external sources.
 
 **Citation:**
 
