@@ -5,7 +5,7 @@ This project utilizes the **Doodle Jump** environment developed by Katti et al. 
 
 **Citation:**
 
-Katti, A. R., Sarkar, A., Swamy, P. M., Kothari, R., & Gurudatt, S. P. (2021). *Reinforcement Learning and Adversarial Attacks on Player Model with Doodle Jump*. Retrieved from [https://pranavmswamy.github.io/doodle-jump-website/assets/CSCI527_Technical_Paper.pdf](https://pranavmswamy.github.io/doodle-jump-website/assets/CSCI527_Technical_Paper.pdf)
+Katti, A. R., Sarkar, A., Swamy, P. M., Kothari, R., & Gurudatt, S. P. (2021). *Reinforcement Learning and Adversarial Attacks on Player Model with Doodle Jump*. Retrieved from [https://pranavmswamy.github.io/doodle-jump-website/assets/CSCI527_Technical_Paper.pdf](https://pranavmswamy.github.io/doodle-jump-website/assets/CSCI527_Technical_Paper.pdf) & (https://github.com/USC-CSCI527-Spring2021/Doodle-Jump)
 
 ## Overview
 ## Overview
