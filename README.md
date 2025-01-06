@@ -59,13 +59,13 @@ Each agent has a dedicated training/testing script. Use the following commands t
 To test the Feature-Based A2C
 
 ```bash
-python a2cAgent.py --test
+python a2cFeature.py --test
 ```
 
 Other Commands for Training
 
 ```bash
-python a2cAgent.py
+python a2cFeature.py
 
   --learning_rate LEARNING_RATE,
                         set learning rate for training the model
@@ -85,13 +85,13 @@ python a2cAgent.py
 To test the Feature-Based DQN
 
 ```bash
-python dqnAgent.py --test
+python dqnFeature.py --test
 ```
 
 Other Commands for Training
 
 ```bash
-python a2cAgent.py
+python dqnFeature.py
 
   --learning_rate LEARNING_RATE,
                         set learning rate for training the model
@@ -111,13 +111,13 @@ python a2cAgent.py
 To test the Pixel-Based A2C
 
 ```bash
-python a2cAgent.py --test
+python a2cFeature.py --test
 ```
 
 Other Commands for Training
 
 ```bash
-python a2cAgent.py
+python a2cFeature.py
 
   --learning_rate LEARNING_RATE,
                         set learning rate for training the model
@@ -137,13 +137,13 @@ python a2cAgent.py
 To test the Pixel-Based DQN
 
 ```bash
-python dqnAgent.py --test
+python dqnPixel.py --test
 ```
 
 Other Commands for Training
 
 ```bash
-python dqnAgent.py
+python dqnPixel.py
 
   --macos                      select model to train the agent on macOS
   --human                      play the game manually without the agent
