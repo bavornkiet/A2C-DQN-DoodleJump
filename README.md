@@ -193,3 +193,67 @@ python dqnPixel.py
 ## References
 
 
+# DSAC for Inventory Management Simulation
+
+This project implements **Distributional Soft Actor Critic (DSAC)** for an inventory management problem using reinforcement learning. The environment simulates a dynamic inventory system, adapted from OR-Gym, and trains a DSAC agent to learn optimal inventory policies in a risk-sensitive setting.
+
+## 🧠 Core Components
+
+### `dsac_agent.py`
+
+Implements the **DSAC (Distributional Soft Actor Critic)** algorithm, including:
+
+- Distributional Q-value estimation
+- Entropy-regularized actor updates
+- Risk-sensitive policy optimization
+
+This is based on the algorithm proposed by Ma et al. (2020) [see citation below].
+
+### `main.py`
+
+Handles:
+
+- Environment initialization
+- Agent creation
+- Training loop and evaluation
+- Logging and saving results
+
+To Train the agent
+
+```bash
+python main.py
+
+### `invm.py`
+A simulation environment for managing inventory under uncertainty. It is a **modified version** of the original environment from OR-Gym, adapted to better suit distributional reinforcement learning and risk-sensitive policies.
+
+### `models/`
+Contains all the PyTorch-based network architectures:
+- Policy (actor) networks
+- Critic networks with distributional output
+- Value networks
+
+
+## Citation
+```
+
+@misc{HubbsOR-Gym,
+author={Christian D. Hubbs and Hector D. Perez and Owais Sarwar and Nikolaos V. Sahinidis and Ignacio E. Grossmann and John M. Wassick},
+title={OR-Gym: A Reinforcement Learning Library for Operations Research Problems},
+year={2020},
+Eprint={arXiv:2008.06319}
+}
+
+@misc{ma2020dsacdistributionalsoftactor,
+title={DSAC: Distributional Soft Actor Critic for Risk-Sensitive Reinforcement Learning},
+author={Xiaoteng Ma and Li Xia and Zhengyuan Zhou and Jun Yang and Qianchuan Zhao},
+year={2020},
+eprint={2004.14547},
+archivePrefix={arXiv},
+primaryClass={cs.LG},
+url={https://arxiv.org/abs/2004.14547},
+}
+
+```
+
+
+
