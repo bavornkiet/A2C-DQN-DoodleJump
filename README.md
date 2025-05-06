@@ -222,6 +222,8 @@ To Train the agent
 
 ```bash
 python main.py
+```
+
 
 ### `invm.py`
 A simulation environment for managing inventory under uncertainty. It is a **modified version** of the original environment from OR-Gym, adapted to better suit distributional reinforcement learning and risk-sensitive policies.
